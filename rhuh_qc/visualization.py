@@ -1,8 +1,11 @@
 """MRI and categorical-label plots; resampling affects display copies only."""
 
+from io import BytesIO
 from numbers import Integral
 
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 import nibabel as nib
 from nibabel.processing import resample_from_to, resample_to_output
@@ -51,7 +54,7 @@ def orthogonal_display(image, mask=None, *, allow_unknown_image_units=True):
     return image, mask, changed
 
 
-def plot_triptych(
+def _triptych_figure(
     image,
     mask=None,
     *,
@@ -59,15 +62,9 @@ def plot_triptych(
     alpha=0.4,
     title="",
     allow_unknown_image_units=True,
-    show=True,
+    standalone=False,
 ):
-    """Plot sagittal, coronal and axial slices, returning the display pair.
-
-    Indices refer to the returned RAS display grid. By default, each plane
-    passes through the largest foreground cross-section, or the image centre
-    without a mask. ID 0 is transparent; other IDs retain their integer values.
-    ``show=False`` suppresses ``plt.show`` for noninteractive validation.
-    """
+    """Build one figure; standalone figures never enter pyplot's display queue."""
     if not np.isfinite(alpha) or not 0 <= alpha <= 1:
         raise ValueError("Opacity must be between 0 and 1")
     if mask is not None:
@@ -123,7 +120,11 @@ def plot_triptych(
         ("Coronal", 1, (0, 2), "L -> R", "I -> S"),
         ("Axial", 2, (0, 1), "L -> R", "P -> A"),
     )
-    figure, axes = plt.subplots(1, 3, figsize=(14, 5))
+    if standalone:
+        figure = Figure(figsize=(14, 5))
+        axes = figure.subplots(1, 3)
+    else:
+        figure, axes = plt.subplots(1, 3, figsize=(14, 5))
     try:
         for ax, (name, axis, dims, xlabel, ylabel) in zip(axes, planes):
             index = indices[axis]
@@ -164,8 +165,69 @@ def plot_triptych(
             title + (" | oblique resampling for display only" if changed else "")
         )
         figure.tight_layout(rect=(0, 0.07, 1, 0.94))
+    except Exception:
+        plt.close(figure)
+        raise
+    return figure, image, mask
+
+
+def plot_triptych(
+    image,
+    mask=None,
+    *,
+    indices=None,
+    alpha=0.4,
+    title="",
+    allow_unknown_image_units=True,
+    show=True,
+):
+    """Plot sagittal, coronal and axial slices, returning the display pair.
+
+    Indices refer to the returned RAS display grid. By default, each plane
+    passes through the largest foreground cross-section, or the image centre
+    without a mask. ID 0 is transparent; other IDs retain their integer values.
+    ``show=False`` suppresses ``plt.show`` for noninteractive validation.
+    Use :func:`render_triptych_png` for widget callbacks, where notebook output
+    routing and the active pyplot backend must not control image updates.
+    """
+    figure, image, mask = _triptych_figure(
+        image, mask, indices=indices, alpha=alpha, title=title,
+        allow_unknown_image_units=allow_unknown_image_units,
+    )
+    try:
         if show:
             plt.show()
     finally:
         plt.close(figure)
     return image, mask
+
+
+def render_triptych_png(
+    image,
+    mask=None,
+    *,
+    indices=None,
+    alpha=0.4,
+    title="",
+    allow_unknown_image_units=True,
+    dpi=100,
+):
+    """Return PNG bytes for a persistent Image widget, without calling show().
+
+    The standalone Agg canvas works with inline and noninteractive notebook
+    backends. It does not publish a second static figure or change the global
+    Matplotlib backend. Native images and categorical labels remain unchanged.
+    """
+    if not np.isfinite(dpi) or dpi <= 0:
+        raise ValueError("DPI must be positive")
+    figure, _, _ = _triptych_figure(
+        image, mask, indices=indices, alpha=alpha, title=title,
+        allow_unknown_image_units=allow_unknown_image_units, standalone=True,
+    )
+    try:
+        figure.set_dpi(dpi)
+        with BytesIO() as buffer:
+            FigureCanvasAgg(figure).print_png(buffer)
+            return buffer.getvalue()
+    finally:
+        plt.close(figure)

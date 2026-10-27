@@ -1,12 +1,13 @@
 """Notebook controls with independent data and cache state per viewer."""
 
 from functools import lru_cache
+from html import escape
 
 import ipywidgets as widgets
 import numpy as np
 
 from .nifti import MODALITIES, assert_same_grid, checked_image, checked_labels
-from .visualization import orthogonal_display, plot_triptych
+from .visualization import orthogonal_display, render_triptych_png
 
 
 def create_nifti_viewer(
@@ -16,7 +17,9 @@ def create_nifti_viewer(
 
     This function does not display the widget itself. Each viewer owns its
     controls, one-pair cache, unit policy and callback guard. The ``controls``
-    attribute exposes the named controls for notebook customization.
+    attribute exposes the named controls for notebook customization. Images
+    update through a persistent Image widget instead of pyplot/Output capture,
+    including when the notebook uses a noninteractive Matplotlib backend.
     """
     if not cases:
         raise ValueError("Cannot create a viewer without NIfTI cases")
@@ -73,6 +76,10 @@ def create_nifti_viewer(
         for name in ("Sagittal", "Coronal", "Axial")
     )
     view_output = widgets.Output()
+    image_view = widgets.Image(
+        format="png", layout=widgets.Layout(width="100%", max_width="1400px")
+    )
+    status = widgets.HTML()
     updating = False
 
     def current_pair():
@@ -84,32 +91,38 @@ def create_nifti_viewer(
         )
 
     def show_error(exc):
-        with view_output:
-            view_output.clear_output(wait=True)
-            print(type(exc).__name__ + ":", exc)
+        message = type(exc).__name__ + ": " + str(exc)
+        image_view.value = b""
+        status.value = '<span style="color:#b42318">' + escape(message) + '</span>'
+        view_output.outputs = (
+            {"output_type": "stream", "name": "stderr", "text": message + "\n"},
+        )
 
     def refresh_view(change=None):
         if updating:
             return
-        with view_output:
-            view_output.clear_output(wait=True)
-            try:
-                image, label, changed, unit_notice = current_pair()
-                if unit_notice:
-                    print("UNIT ASSUMPTION:", unit_notice)
-                plot_triptych(
-                    image,
-                    label,
-                    indices=[slider.value for slider in slice_controls],
-                    alpha=alpha_select.value,
-                    title=(
-                        f"{patient_select.value} / {time_select.value} / {modality_select.value}"
-                        + (" | resampled for display" if changed else "")
-                    ),
-                    allow_unknown_image_units=allow_unknown_image_units,
-                )
-            except Exception as exc:
-                print(type(exc).__name__ + ":", exc)
+        status.value = "Updating image..."
+        try:
+            image, label, changed, unit_notice = current_pair()
+            indices = [slider.value for slider in slice_controls]
+            title = f"{patient_select.value} / {time_select.value} / {modality_select.value}"
+            image_view.value = render_triptych_png(
+                image,
+                label,
+                indices=indices,
+                alpha=alpha_select.value,
+                title=title + (" | resampled for display" if changed else ""),
+                allow_unknown_image_units=allow_unknown_image_units,
+            )
+            status.value = escape(title + f" | slices={indices} | opacity={alpha_select.value:.2f}")
+            if unit_notice:
+                status.value += '<br><span style="color:#8a5700">' + escape(unit_notice) + '</span>'
+            view_output.outputs = (
+                ({"output_type": "stream", "name": "stdout", "text": "UNIT ASSUMPTION: " + unit_notice + "\n"},)
+                if unit_notice else ()
+            )
+        except Exception as exc:
+            show_error(exc)
 
     def select_case(change=None):
         nonlocal updating
@@ -151,6 +164,8 @@ def create_nifti_viewer(
             widgets.HBox([patient_select, time_select, modality_select]),
             alpha_select,
             *slice_controls,
+            status,
+            image_view,
             view_output,
         ]
     )
@@ -161,6 +176,8 @@ def create_nifti_viewer(
         "alpha": alpha_select,
         "slices": slice_controls,
         "output": view_output,
+        "image": image_view,
+        "status": status,
     }
     select_case()
     return viewer

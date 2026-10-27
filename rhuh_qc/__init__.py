@@ -17,7 +17,7 @@ from .dicom import (
     load_dicom_folder,
     load_dicom_zip,
 )
-from .visualization import orthogonal_display, plot_triptych
+from .visualization import orthogonal_display, plot_triptych, render_triptych_png
 from .widgets import create_nifti_viewer
 
 __all__ = [
@@ -34,4 +34,5 @@ __all__ = [
     "load_dicom_zip",
     "orthogonal_display",
     "plot_triptych",
+    "render_triptych_png",
 ]
