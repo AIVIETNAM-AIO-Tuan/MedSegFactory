@@ -1,0 +1,21 @@
+# Local datasets
+/data/
+
+# Local tests
+/tests/
+
+# Local research notes and agent-generated analysis (keep README/model configs)
+/HANDOFF.md
+/REPO_AUDIT.md
+/DECISIONS_TO_CONFIRM.md
+/REPRODUCTION_PLAN.md
+/NOTES-postop-plan.md
+/NOTES-postop-plan.pdf
+/.claude/
+/.understand-anything/
+
+# Python and notebook runtime artifacts
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
