@@ -399,3 +399,45 @@ git ls-files found no tracked files under that directory. No files were deleted.
   - runner `notebooks/RHUH_GBM_Colab_stage4_r2.ipynb`.
 - Tests: 20 overfit tests. The pure-noise path of `generate` is bit-identical
   to the r1 code path, and 7/7 planted mutations were caught.
+
+## 2026-11-04 — Stage 4 r2 result (Colab; commit de6b0d4): ITERATE; start of sampling located
+
+- Reproducibility: step 0 identical to r1. At step 500 the brain-only MAE was
+  0.137 (r1: 0.139) and the shifted control 0.137 (r1: 0.139). Eval losses
+  were equal. The checks failed the same way: image MAE not below copy, ID-2
+  Dice 0.40, ID 3 on 2/4 slices, 1,076 mm2 of labels on label-free slices.
+- New metrics at step 500 (pure noise):
+  - whole-slice MAE 0.245; background MAE 0.301; foreground Dice 0.63;
+  - own target retrieved on 1/16; 14/16 generations nearest to the same two
+    training slices (one patient's ID-3 slices);
+  - step 250 scored better on these (0.189 / 0.210 / 0.71) even though its
+    brain-only MAE was worse.
+- Leftover signal (oracle start at t = 981 from the own target):
+  - whole-slice MAE 0.016 (0.065 x pure noise), background 0.004, foreground
+    Dice 0.98;
+  - own target retrieved on 13/16; the 3 misses are near-identical neighbour
+    slices;
+  - ID-2 Dice 0.91, ID-3 Dice 0.85 (4/4), 0 mm2 of labels on label-free slices.
+  - Reading: generation depends on the leftover signal, TRUE.
+- Another slice's leftover: the output was nearest to that source on 7/16, so
+  the reading is FALSE (threshold 12). Post-hoc breakdown, not preregistered:
+  - In the 12 cases whose source has the same prompt, the output was the source
+    or its near-identical neighbour 10 times.
+  - In the 4 cases with a different prompt, the output was the slice's own
+    target every time.
+  - All outputs were crisp MRI with black backgrounds. Some pairs mixed one
+    slice's image with another's mask.
+- Partner reliance: image loss with a clean mask 0.95x the equal-noise loss;
+  mask loss with a clean image 0.89x. Readings FALSE.
+- Guidance: lower guidance was worse. Whole-slice MAE 0.254 / 0.262 / 0.245 and
+  label-free labels 4,756 / 1,945 / 1,076 mm2 at guidance 1 / 3 / 7.5; ID 3 on
+  0 / 1 / 2 of 4. Reading FALSE.
+- Interpretation:
+  - The model renders the 16 memorized pairs almost exactly once the start says
+    which slice it is.
+  - From pure noise nothing slice-specific steers it: the pre-op inputs barely
+    do, and the text only names the class group.
+  - It therefore collapses onto one memorized mode, half-formed, with a gray
+    background.
+  - The separate-timestep and guidance explanations are not supported.
+- Cost: training 1,105 s, peak 70.2 GiB, whole run 31 min.

@@ -119,8 +119,17 @@ Stage 4 r2 prepared (user-approved), NOT RUN.
 - Runner: `notebooks/RHUH_GBM_Colab_stage4_r2.ipynb`.
 - The pure-noise generation path is bit-identical to r1's (CPU test).
 
+Stage 4 r2 on Colab (commit de6b0d4, 2026-11-04): r1 reproduced; ITERATE.
+- From its own target's leftover signal at t = 981 (oracle), the model renders
+  image and mask almost exactly: whole-slice MAE 0.016 vs 0.245 from pure
+  noise, own target retrieved 13/16, ID 3 found 4/4, label-free slices empty.
+- From pure noise, 14/16 generations collapse toward the same two training slices.
+- Neither separate per-stream timesteps nor guidance explains the failure.
+- The failure is at the start of sampling: nothing slice-specific steers it.
+
 Next smallest steps:
-1. Run Stage 4 r2 on Colab (about 35 minutes). Its readings pick the one training change for r3, declared before r3.
+1. Choose the r3 change (user decision): an inference-safe start from the
+   noised pre-op pair, or a training-side schedule fix (zero terminal SNR).
 2. Stage 5 (1,000-step pilot) needs a Stage 4 PASS, or an approved deviation.
 3. Optional: an affine registration variant (policy v2) to recover quarantined pairs.
 
