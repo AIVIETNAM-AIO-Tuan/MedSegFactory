@@ -97,10 +97,23 @@ The local dry run selected 16 training slices: 4 ID 3, 4 labelled without ID 3,
 because it could not supply two label-free slices. The notebook glue ran end to
 end on CPU with tiny random models.
 
+Stage 4 r1 on Colab (commit 6b0a271): ITERATE by the preregistered checks.
+- Preflight passed: the adapter is exact with TF32 off.
+- Training was stable and the fixed-noise loss fell 19x (image) and 60x (mask).
+- Generations do not follow their own pre-op inputs: matched vs shifted-input
+  image MAE 0.1387 vs 0.1389; label-free slices got 1,080 mm2 of labels on
+  average; the added adapter weights barely moved (mean |w| 4.4e-4).
+- PNG grids: masks are copies of training masks (often the wrong slice's);
+  generated MRI are blurry brain shapes or flat gray fields, mostly without the
+  black background. Likely cause (untested): the model reads what it needs from
+  the noisy input during training, so the conditioning was never needed; that
+  information is absent when sampling from pure noise. Details in Event.md.
+
 Next smallest steps:
-1. Run the Stage 4 notebook on Colab (about 35 minutes). Then review the decision, the per-slice scores and the PNG grids.
-2. Stage 5 (1,000-step pilot): only after a Stage 4 PASS and explicit approval.
-3. Optional: an affine registration variant (policy v2) to recover quarantined pairs.
+1. Review the r1 PNG grids.
+2. Choose the one change for the next run (user decision).
+3. Stage 5 (1,000-step pilot) needs a Stage 4 PASS, or an approved deviation.
+4. Optional: an affine registration variant (policy v2) to recover quarantined pairs.
 
 ## 2026-11-03 — Git hygiene
 

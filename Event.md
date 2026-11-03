@@ -282,3 +282,76 @@ git ls-files found no tracked files under that directory. No files were deleted.
 - Local smoke run of the notebook glue (CPU, tiny random models, 4 steps) found
   one bug before Colab: eval-loss keys mixed integers and strings, which broke
   the sorted-key JSON record. Fixed.
+
+## 2026-11-03 — Stage 4 r1 result (Colab; commit 6b0a271): ITERATE
+
+- Preflight PASS. With TF32 off, the 11-channel adapter matched the released
+  model exactly (max difference 0.0). With TF32 on, the difference was 0.0024
+  (relative 5.4e-4), as in Stage 3. The Stage 3 difference was TF32 rounding.
+- Selection as in the dry run; the rank-2 positive patient was skipped.
+- Training: 500 steps, every loss finite, 1,108 s, peak 70.2 GiB. Training
+  loss fell from 0.082 to 0.003; the mean of the last 50 steps was 0.005.
+- Fixed-noise eval loss, steps 0 / 250 / 500:
+  - image 0.104 / 0.013 / 0.0055;
+  - mask 0.055 / 0.0020 / 0.0009.
+  It fell at every timestep, including t = 900 (image 0.0067 to 0.0012).
+- Generations at step 500, scored against their own targets:
+  - image MAE 0.139 (step 0: 0.278; copy control 0.0965); below the copy
+    control on only 4 of 16 slices, all from one patient;
+  - ID-2 Dice 0.37; ID-3 Dice 0.24; ID 3 overlapped on 1 of 4 slices;
+  - label-free slices: 1,080 mm2 of labels on average, 7 of 8 above 600 mm2;
+  - invented ID 1: 0.05 mm2.
+- Shifted-condition control (pre-op inputs from another patient):
+  - image MAE 0.1389 against 0.1387 matched; matched inputs gave the lower
+    error on only 5 of 16 slices (mean per-slice gap 0.009);
+  - ID-2 Dice 0.39 and ID-3 Dice 0.36, both higher than with the matched inputs;
+  - two slices were reproduced almost exactly (Dice 0.94-0.97) under both.
+- Added adapter weights: mean |w| 4.4e-4. That is 9% of the most Adam can move
+  a weight in 500 steps at lr 1e-5 (5e-3).
+- Preregistered decision: ITERATE.
+  - Failed: image MAE below copy; ID-2 Dice; ID-3 overlap; label-free labels.
+  - The "below shifted" check passed by 0.0002 only. It had no margin and is
+    not evidence that the pre-op inputs are used.
+- Interpretation, NOT yet tested:
+  - The model memorized the 16 pairs through the noisy latent itself. It then
+    generates one of them, chosen by the starting noise; neither the pre-op
+    inputs nor the text decide the output.
+  - In a 16,384-value latent, 16 targets can be told apart from the noisy
+    latent at every timestep. The loss therefore gives almost no pressure to
+    use the conditioning.
+  - So this 16-slice test cannot show whether the adapter learns to use the
+    pre-op inputs. More steps at the same setting are unlikely to change that:
+    the scores barely moved between steps 250 and 500.
+- PNG grids: on Drive only, not yet reviewed.
+
+## 2026-11-03 — Stage 4 r1 visual review of the PNG grids (refines the reading above)
+
+- Step 0: generated MRI are streaky high-contrast textures with no brain.
+  Masks are large ID-1 blobs: the released model's gray-level masks, read by
+  the class-RGB decoder.
+- Step 250: generated MRI look brain-like (gray brain shapes, some with
+  ventricles), but often at the wrong anatomical level. Skull-base targets get
+  supratentorial-looking slices. Masks are now green/red shapes like the
+  training masks.
+- Step 500: several generated MRI are flatter, nearly uniform gray fields.
+  Most lack the black background and fill most of the crop. Image MAE still
+  improved slightly (0.145 to 0.139): MAE rewards blur, so it needs a visual
+  check.
+- Masks: copies of training-mask shapes, often from the wrong slice (one
+  patient's ID-3 slice receives another patient's mask). Label-free slices get
+  edema-like green blobs. Red ID 3 appears almost only where the prompt names
+  enhancing tumor, so the text steers which classes appear. It does not keep
+  label-free slices empty.
+- Generated images and masks often do not correspond to each other.
+- The shifted-input grid looks nearly identical to the matched grid: the
+  pre-op inputs are not used.
+- Refined reading:
+  - The mask stream memorized the training masks.
+  - The image stream did NOT memorize the training images. It lowered its loss
+    without learning to generate MRI from pure noise.
+  - This fits a denoiser that reads what it needs (which slice, where the brain
+    edge is) from the noisy input during training. The SD schedule leaves about
+    7% of the signal even at the last step, while sampling starts from pure
+    noise, which contains none.
+  - The pre-op inputs would supply that information, but they are not used yet.
+  - Untested.
