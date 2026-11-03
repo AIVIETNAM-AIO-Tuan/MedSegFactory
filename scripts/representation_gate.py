@@ -19,7 +19,7 @@ sys.path.insert(0, str(REPO))
 from rhuh_synthesis.codec import MASK_CODECS  # noqa: E402
 from rhuh_synthesis.manifest import write_once_json  # noqa: E402
 from rhuh_synthesis.provenance import code_version, config_sha256, snapshot_tests  # noqa: E402
-from rhuh_synthesis.representation import run_gate, vae_codec  # noqa: E402
+from rhuh_synthesis.representation import make_crop_map, run_gate, vae_codec  # noqa: E402
 
 CODEC_TAGS = {"scalar_id_over_max_rgb": "scalar", "class_separated_rgb": "class_rgb"}
 
@@ -38,9 +38,16 @@ def main():
     parser.add_argument("--codec", choices=sorted(MASK_CODECS), default="scalar_id_over_max_rgb")
     parser.add_argument("--upsample", type=int, choices=(1, 2), default=1, help="2 = 512 px, same field of view")
     parser.add_argument("--batch", type=int, default=16)
-    parser.add_argument("--out", type=Path, help="Default: representation_gate_<size>_<codec>/report.json")
+    parser.add_argument("--crop-mm", type=float, help="In-plane crop centred on the pre-op brain (e.g. 192)")
+    parser.add_argument("--out-px", type=int, default=512, help="Crop size in pixels (with --crop-mm)")
+    parser.add_argument("--out", type=Path, help="Default: representation_gate_<variant>/report.json")
     args = parser.parse_args()
-    variant = f"{256 * args.upsample}_{CODEC_TAGS[args.codec]}"
+    if args.crop_mm is not None and args.upsample != 1:
+        sys.exit("Use --crop-mm or --upsample 2, not both")
+    if args.crop_mm is not None:
+        variant = f"crop{int(args.crop_mm)}_{args.out_px}_{CODEC_TAGS[args.codec]}"
+    else:
+        variant = f"{256 * args.upsample}_{CODEC_TAGS[args.codec]}"
     if args.out is None:
         args.out = PRIVATE / f"representation_gate_{variant}" / "report.json"
     if args.out.exists():
@@ -52,7 +59,7 @@ def main():
     vae = AutoencoderKL.from_pretrained(
         args.vae, subfolder=args.subfolder, local_files_only=not args.allow_download
     ).to(args.device).eval()
-    references, spacing = {}, None
+    references, crops, spacing = {}, {}, None
     paths = sorted(args.export_root.glob("train*/RHUH-*.npz"))
     if len({p.stem for p in paths}) != len(paths):
         sys.exit("A patient appears in more than one export folder; resolve before the gate")
@@ -61,6 +68,8 @@ def main():
             continue
         with np.load(path) as data:
             references[path.stem] = data["label"]
+            if args.crop_mm is not None:
+                crops[path.stem] = make_crop_map(data["pre_foreground"], crop_mm=args.crop_mm, out_px=args.out_px)
             frame_spacing = tuple(float(v) for v in np.linalg.norm(data["frame_affine"][:3, :3], axis=0)[::-1])
         if spacing not in (None, frame_spacing):
             raise ValueError("Mixed frame spacings")
@@ -72,8 +81,15 @@ def main():
         references, spacing, lambda path: vae_codec(vae, path, device=args.device), gate,
         min_iou=config["evaluation"]["lesions"]["min_iou"], tiny_ml=config["evaluation"]["lesions"]["tiny_ml"],
         mask_codec=args.codec, upsample=args.upsample, batch=args.batch,
+        crops=crops if args.crop_mm is not None else None,
     )
     report["variant"]["name"] = variant
+    if args.crop_mm is not None:
+        report["variant"].update(crop_mm=args.crop_mm, out_px=args.out_px, pixel_mm=args.crop_mm / args.out_px)
+        uncovered = {p: q for p, q in report["crop_qc"].items()
+                     if q["excluded_foreground_voxels"] or q["excluded_reference_label_voxels"]}
+        print(f"crop coverage: {len(references) - len(uncovered)}/{len(references)} patients fully covered; "
+              f"flagged: {len(uncovered)} (details in the report)")
     snapshot, snapshot_sha = snapshot_tests(REPO / "tests", args.out.parent / "test_snapshots")
     report.update(
         role="train",

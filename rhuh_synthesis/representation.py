@@ -52,7 +52,86 @@ def downsample_labels(slices, factor, max_id=3):
     return np.where((tied.sum(axis=-1) > 1) & top_left_tied, top_left, mode).astype(np.uint8)
 
 
-def roundtrip_volume(labels_zyx, codec_fn, *, mask_codec=REFERENCE_CODEC, upsample=1, batch=16):
+def make_crop_map(pre_foreground_zyx, *, crop_mm, out_px, voxel_mm=1.0):
+    """Pixel/voxel maps for an in-plane crop centred on the pre-op foreground.
+
+    Uses only the pre-op foreground. Coordinates are frame voxel-edge units:
+    voxel ``k`` spans ``[k, k + 1)`` and crop pixel ``i`` has its centre at
+    ``start + (i + 0.5) * pixel``. Returns a dict with per-axis pixel->voxel
+    indices, validity masks, the nearest pixel for every covered voxel and
+    coverage of the pre-op foreground.
+    """
+    foreground = np.asarray(pre_foreground_zyx, bool)
+    if not foreground.any():
+        raise ValueError("Empty pre-op foreground")
+    if voxel_mm != 1.0:
+        raise ValueError("Crop maps assume the 1 mm frame")
+    pixel = crop_mm / out_px
+    crop = {"crop_mm": float(crop_mm), "out_px": int(out_px), "pixel_mm": float(pixel), "axes": []}
+    for axis, size in ((1, foreground.shape[1]), (2, foreground.shape[2])):
+        present = np.flatnonzero(foreground.any(axis=tuple(a for a in (0, 1, 2) if a != axis)))
+        centre = (present.min() + present.max() + 1) / 2.0
+        start = centre - crop_mm / 2.0
+        centres = start + (np.arange(out_px) + 0.5) * pixel
+        voxel = np.floor(centres).astype(np.int64)
+        valid = (voxel >= 0) & (voxel < size)
+        nearest = np.full(size, -1, dtype=np.int64)
+        best = np.full(size, np.inf)
+        for index in np.flatnonzero(valid):  # increasing index: lower index wins exact ties
+            distance = abs(centres[index] - (voxel[index] + 0.5))
+            if distance < best[voxel[index]]:
+                best[voxel[index]], nearest[voxel[index]] = distance, index
+        crop["axes"].append({"start": float(start), "voxel": voxel, "valid": valid, "nearest": nearest})
+    covered = (crop["axes"][0]["nearest"] >= 0)[:, None] & (crop["axes"][1]["nearest"] >= 0)[None, :]
+    crop["covered_yx"] = covered
+    crop["excluded_foreground_voxels"] = int((foreground & ~covered[None]).sum())
+    return crop
+
+
+def crop_forward(slices, crop):
+    """``[N, H, W]`` frame labels -> ``[N, out_px, out_px]`` crop labels (nearest neighbour)."""
+    (ay, ax) = crop["axes"]
+    slices = np.asarray(slices)
+    rows = np.clip(ay["voxel"], 0, slices.shape[1] - 1)
+    cols = np.clip(ax["voxel"], 0, slices.shape[2] - 1)
+    out = slices[:, rows][:, :, cols]
+    out[:, ~ay["valid"], :] = 0
+    out[:, :, ~ax["valid"]] = 0
+    return out
+
+
+def crop_back(slices, crop, frame_hw, max_id=3):
+    """``[N, out_px, out_px]`` crop labels -> ``[N, H, W]`` frame labels (preregistered rule).
+
+    Each covered voxel takes its most frequent ID; ties go to the pixel nearest
+    the voxel centre. Uncovered voxels are background.
+    """
+    (ay, ax) = crop["axes"]
+    height, width = frame_hw
+    slices = np.asarray(slices)
+    valid = ay["valid"][:, None] & ax["valid"][None, :]
+    flat = (np.clip(ay["voxel"], 0, height - 1)[:, None] * width + np.clip(ax["voxel"], 0, width - 1)[None, :])[valid]
+    covered = crop["covered_yx"]
+    nearest_rows, nearest_cols = ay["nearest"], ax["nearest"]
+    out = np.zeros((len(slices), height, width), dtype=np.uint8)
+    rows, cols = np.nonzero(covered)
+    for n, decoded in enumerate(slices):
+        values = decoded[valid]
+        counts = np.stack(
+            [np.bincount(flat[values == label_id], minlength=height * width) for label_id in range(max_id + 1)],
+            axis=-1,
+        ).reshape(height, width, max_id + 1)
+        tied = counts == counts.max(axis=-1, keepdims=True)
+        mode = np.argmax(counts, axis=-1)
+        nearest = np.zeros((height, width), dtype=np.int64)
+        nearest[rows, cols] = decoded[nearest_rows[rows], nearest_cols[cols]]
+        nearest_tied = np.take_along_axis(tied, nearest[..., None], axis=-1)[..., 0]
+        chosen = np.where((tied.sum(axis=-1) > 1) & nearest_tied, nearest, mode)
+        out[n] = np.where(covered, chosen, 0)
+    return out
+
+
+def roundtrip_volume(labels_zyx, codec_fn, *, mask_codec=REFERENCE_CODEC, upsample=1, batch=16, crop=None):
     """Round-trip a ``[Z, Y, X]`` label volume slice by slice; returns uint8 IDs.
 
     ``codec_fn`` maps a float32 batch ``[N, 3, H, W]`` in [-1, 1] to decoder
@@ -61,16 +140,24 @@ def roundtrip_volume(labels_zyx, codec_fn, *, mask_codec=REFERENCE_CODEC, upsamp
     so scoring stays in the 1 mm patient grid.
     """
     encode, decode = MASK_CODECS[mask_codec]
+    if crop is not None and upsample != 1:
+        raise ValueError("Use either a crop or full-field upsampling, not both")
     labels_zyx = np.asarray(labels_zyx)
     out = np.empty(labels_zyx.shape, dtype=np.uint8)
     for start in range(0, labels_zyx.shape[0], batch):
         chunk = labels_zyx[start : start + batch]
-        work = upsample_labels(chunk, upsample) if upsample > 1 else chunk
+        if crop is not None:
+            work = crop_forward(chunk, crop)
+        else:
+            work = upsample_labels(chunk, upsample) if upsample > 1 else chunk
         decoded = np.asarray(codec_fn(encode(work)))
         if decoded.shape != (len(work), 3) + work.shape[1:]:
             raise ValueError(f"Codec returned {decoded.shape} for {work.shape}")
         restored = decode(decoded)
-        out[start : start + batch] = downsample_labels(restored, upsample) if upsample > 1 else restored
+        if crop is not None:
+            out[start : start + batch] = crop_back(restored, crop, chunk.shape[1:])
+        else:
+            out[start : start + batch] = downsample_labels(restored, upsample) if upsample > 1 else restored
     return out
 
 
@@ -136,13 +223,14 @@ def summarize_path(patients, thresholds):
 
 def run_gate(
     references, spacing, codec_factory, thresholds, *, min_iou=0.10, tiny_ml=0.1,
-    mask_codec=REFERENCE_CODEC, upsample=1, batch=16,
+    mask_codec=REFERENCE_CODEC, upsample=1, batch=16, crops=None,
 ):
     """Run every path for every training reference.
 
     ``references`` maps patient -> ``[Z, Y, X]`` labels. ``codec_factory(path)``
     returns a fresh codec function for one patient and path, where ``path`` is
-    ``"mean"`` or ``"sample_<seed>"`` for each configured seed.
+    ``"mean"`` or ``"sample_<seed>"`` for each configured seed. ``crops`` maps
+    patient -> ``make_crop_map`` output for the crop variant.
     """
     paths = ["mean"] + [f"sample_{seed}" for seed in thresholds["sample_seeds"]]
     report = {
@@ -150,11 +238,23 @@ def run_gate(
         "paths": {},
         "per_patient": {},
     }
+    if crops is not None:
+        report["crop_qc"] = {
+            patient: {
+                "excluded_foreground_voxels": crops[patient]["excluded_foreground_voxels"],
+                "excluded_reference_label_voxels": int(
+                    ((np.asarray(labels) > 0) & ~crops[patient]["covered_yx"][None]).sum()
+                ),
+                "starts_yx": [axis["start"] for axis in crops[patient]["axes"]],
+            }
+            for patient, labels in references.items()
+        }
     for path in paths:
         per_patient = {}
         for patient, labels in sorted(references.items()):
             predicted = roundtrip_volume(
-                labels, codec_factory(path), mask_codec=mask_codec, upsample=upsample, batch=batch
+                labels, codec_factory(path), mask_codec=mask_codec, upsample=upsample, batch=batch,
+                crop=None if crops is None else crops[patient],
             )
             per_patient[patient] = patient_metrics(labels, predicted, spacing, min_iou=min_iou, tiny_ml=tiny_ml)
         report["per_patient"][path] = per_patient

@@ -146,6 +146,29 @@ gates; no diffusion training, generation, validation or test scoring.
 - New Colab runner `notebooks/RHUH_GBM_Colab_fallback_gates.ipynb`. Each variant
   writes its own write-once report; the v1 report is untouched.
 
+## 2026-11-03 — Fallback gate results and crop addendum (user-approved)
+
+- Colab results (24 accepted training patients; every path agreed). No variant
+  passed, so none was selected:
+
+  | Variant | ID-3 Dice | Lesion recall (pooled) | Spurious ID 3 | Unsupported ID 1 |
+  |---|---|---|---|---|
+  | 512_scalar | 0.344 | 0.429 (9/14) | 0.020 mL | 2.41 mL |
+  | 256_class_rgb | 0.626 | 0.943 (12/14) | 0.0001 mL | 0.0003 mL |
+  | 512_class_rgb | 0.859 | 0.971 (13/14) | 0.0002 mL | 0.0000 mL |
+
+  512_class_rgb failed only the Dice threshold (0.90). Thresholds were not changed.
+- Addendum, user-approved and fixed in the config before it ran: crop192_512_class_rgb
+  is appended to the order. It uses a 192 mm in-plane crop centred on each patient's
+  pre-op brain (size from training pre-op brain extents, max 182 x 147 mm), resampled
+  to 512 px (0.375 mm/px, 3 mm VAE cell), with the class-RGB codec. Mapping back
+  to 1 mm uses the voxel-wise most frequent ID, with ties going to the nearest
+  pixel. Uncovered brain or label voxels are flagged and reported.
+- Local smoke test after the addendum (same hard training slice, posterior mean
+  only, not the gate): residual-tumor voxels kept 28/29, no fake ID 3 or ID 1.
+- New Colab runner `notebooks/RHUH_GBM_Colab_crop_gate.ipynb`; its test step is
+  optional and uses any snapshot already on Drive.
+
 ## 2026-11-03 — Ignore graphify output
 
 User requested exclusion of the graphify folder from Git. Added the existing

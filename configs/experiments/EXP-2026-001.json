@@ -81,7 +81,22 @@
       "back_to_1mm": "each 2x2 block takes its most frequent ID; ties go to the top-left pixel",
       "class_rgb_decoding": "strongest channel above 0.5 after denormalization; otherwise background; exact ties go to the higher ID",
       "selection_rule": "select the first variant in order that passes on every path; if none passes, report a representation failure",
-      "not_yet_gated": "fixed pre-op crop + 512 px (plan section 8 fallback 3)"
+      "not_yet_gated": "fixed pre-op crop + 512 px (plan section 8 fallback 3)",
+      "addendum_2026_11_03": {
+        "reason": "the three variants above failed (best: 512_class_rgb, Dice 0.859); the plan's fallback 3 (crop + 512 px) is added with the class-separated codec, before it was run; thresholds unchanged",
+        "order_after_addendum": ["512_scalar", "256_class_rgb", "512_class_rgb", "crop192_512_class_rgb"],
+        "crop192_512_class_rgb": {
+          "mask_codec": "class_separated_rgb",
+          "crop_mm": 192,
+          "out_px": 512,
+          "pixel_mm": 0.375,
+          "crop_size_source": "largest in-plane pre-op brain extent over the 24 accepted training patients (182 x 147 mm), rounded up to 192 mm; not chosen from any gate result",
+          "centre": "centre of the in-plane bounding box of the patient's own pre-op foreground (all slices); pre-op only, inference-safe",
+          "forward": "nearest neighbour: each crop pixel takes the 1 mm frame voxel containing its centre; outside the frame -> background",
+          "back_to_1mm": "each 1 mm voxel takes the most frequent ID among the crop pixels whose centres fall in it; ties -> the pixel nearest the voxel centre (lower index if equidistant); voxels not covered by the crop -> background",
+          "coverage_rule": "a patient whose pre-op foreground is not fully covered by the crop is flagged, and its excluded brain and reference-label voxels are reported; nothing outside the crop counts as preserved"
+        }
+      }
     }
   },
   "evaluation": {

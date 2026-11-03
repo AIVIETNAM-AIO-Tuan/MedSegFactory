@@ -69,8 +69,12 @@ Representation gate v1 (256 px, scalar codec): FAIL on every path. ID-3 Dice
 Representation fallbacks implemented and preregistered (512_scalar, 256_class_rgb,
 512_class_rgb; first passing variant selected). Local suite: 187 passed, 5 subtests.
 
+Fallback gates on Colab: none passed. Best was 512_class_rgb (Dice 0.859 vs 0.90;
+recall, spurious ID 3 and ID 1 all pass). The crop192_512_class_rgb addendum is
+implemented; local suite 191 passed, 5 subtests.
+
 Next smallest steps:
-1. Run `notebooks/RHUH_GBM_Colab_fallback_gates.ipynb` on Colab (copy the updated `test_snapshots` folder to Drive first) and apply the selection rule.
+1. Run `notebooks/RHUH_GBM_Colab_crop_gate.ipynb` on Colab (no uploads needed) and apply the selection rule.
 2. On the Colab RTX 6000: confirm the GPU, install a matching torch build, run the model tests once, then run the representation gate (~minutes on GPU vs ~12 h on this CPU).
 3. Register/export the validation patients under the frozen policy; keep test sealed.
 4. Load the MedSegFactory checkpoint strictly and check adapter equivalence on the real model.
