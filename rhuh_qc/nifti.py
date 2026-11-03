@@ -1,5 +1,6 @@
 """Read-only discovery and structural quality checks for RHUH-GBM NIfTI data."""
 
+from os import walk
 from pathlib import Path
 
 import nibabel as nib
@@ -26,24 +27,27 @@ def discover_cases(root):
     Cases are keyed by ``(patient, timepoint)``. Each entry contains ``folder``,
     a list of candidate ``labels``, and candidate ``images`` for each modality.
     Duplicate patient/timepoint keys across release folders are rejected rather
-    than silently choosing one release.
+    than silently choosing one release. Search stops at patient directories and
+    inspects only their immediate numeric timepoints, avoiding deep DICOM trees.
     """
     root = Path(root)
     if not root.is_dir():
         raise FileNotFoundError(f"Khong tim thay ROOT: {root}")
-    subjects = [path for path in root.rglob("RHUH-*") if path.is_dir()]
-    if root.name.startswith("RHUH-"):
-        subjects.append(root)
-    folders = sorted(
-        {
-            path
-            for subject in subjects
-            for path in subject.iterdir()
-            if path.is_dir() and path.name.isdigit()
-        }
-    )
+    folders = []
+    for current, directories, _ in walk(root):
+        subject = Path(current)
+        if not subject.name.startswith("RHUH-"):
+            continue
+        timepoints = [name for name in directories if name.isdigit()]
+        # Actual patient IDs are RHUH-<digits>. Retain support for synthetic
+        # RHUH-* names when they have numeric visits. Package containers such
+        # as RHUH-GBM and RHUH-GBM_nii_v1 must remain searchable.
+        if not subject.name.removeprefix("RHUH-").isdigit() and not timepoints:
+            continue
+        folders.extend(subject / name for name in timepoints)
+        directories.clear()
     cases = {}
-    for folder in folders:
+    for folder in sorted(folders):
         files = nifti_files(folder)
         entry = {
             "folder": folder,

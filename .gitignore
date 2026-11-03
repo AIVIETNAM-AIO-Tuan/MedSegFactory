@@ -13,6 +13,7 @@
 /NOTES-postop-plan.pdf
 /.claude/
 /.understand-anything/
+/graphify-out/
 
 # Python and notebook runtime artifacts
 __pycache__/

@@ -11,6 +11,7 @@ import nibabel as nib
 from nibabel.processing import resample_from_to, resample_to_output
 import numpy as np
 
+from .intensity import border_background, foreground_mask
 from .nifti import assert_same_grid, checked_labels
 
 
@@ -41,9 +42,16 @@ def orthogonal_display(image, mask=None, *, allow_unknown_image_units=True):
         # Interpolate MRI in floating point, including integer-valued sources.
         header = image.header.copy()
         header.set_data_dtype(np.float32)
-        image = image.__class__(image.get_fdata(dtype=np.float32), image.affine, header)
+        data = image.get_fdata(dtype=np.float32)
+        # Fill outside the source FOV with its own background, not an arbitrary 0,
+        # so display windows can still separate background from tissue.
+        background = border_background(data)
+        image = image.__class__(data, image.affine, header)
         image = resample_to_output(
-            image, voxel_sizes=nib.affines.voxel_sizes(image.affine), order=1
+            image,
+            voxel_sizes=nib.affines.voxel_sizes(image.affine),
+            order=1,
+            cval=0.0 if background is None else background,
         )
         if mask is not None:
             mask = resample_from_to(mask, (image.shape, image.affine), order=0)
@@ -90,8 +98,9 @@ def _triptych_figure(
             for index, label_id in enumerate(ids)
         }
     )
-    sample = data.ravel()[:: max(1, data.size // 500_000)]
-    sample = sample[sample != 0]
+    foreground, _ = foreground_mask(data)
+    sample = data[foreground]
+    sample = sample[:: max(1, sample.size // 500_000)]
     low, high = np.percentile(sample, [1, 99]) if sample.size else (0.0, 1.0)
     high = high if high > low else low + 1
     if indices is None:

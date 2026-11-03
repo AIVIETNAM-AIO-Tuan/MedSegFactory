@@ -1,0 +1,110 @@
+{
+  "experiment_id": "EXP-2026-001",
+  "config_version": 1,
+  "note": "Frozen settings from REPRODUCTION_PLAN.md and the EXP-2026-001 card. Contains no patient identifiers; private manifests and splits live under data/.",
+  "data": {
+    "pre_visit": "0",
+    "post_visit": "1",
+    "modality": "t1ce",
+    "label_ids": [0, 1, 2, 3],
+    "unknown_mri_unit_policy": "assume the mm unit of the matching label grid; record the assumption, never edit source headers"
+  },
+  "split": {
+    "seed": 2026,
+    "algorithm": "stratified-largest-remainder-v1",
+    "targets": {"train": 28, "val": 6, "test": 6},
+    "primary_stratum": "post_id3_present",
+    "secondary_stratum": "pre_scanner_differs_from_post",
+    "reported_only": ["post_day_bin"]
+  },
+  "frame": {
+    "orientation": "RAS",
+    "spacing_mm": 1.0,
+    "inplane_size": 256,
+    "center": "pre-op source field-of-view center",
+    "z_extent": "axis-aligned bounding box of the pre-op source field of view"
+  },
+  "intensity": {
+    "percentiles": [1.0, 99.0],
+    "foreground": "voxels differing from the background: the border mode, accepted only if it covers min_border_fraction of the border and is the whole-volume mode",
+    "min_border_fraction": 0.9
+  },
+  "registration": {
+    "direction": "post_target_to_pre_frame",
+    "transform": "rigid",
+    "metric": "mattes_mutual_information",
+    "histogram_bins": 50,
+    "sampling_fraction": 0.2,
+    "sampling_seed": 2026,
+    "lesion_exclusion_mm": 5.0,
+    "optimizer": {
+      "type": "regular_step_gradient_descent",
+      "learning_rate": 2.0,
+      "min_step": 0.001,
+      "iterations": 300,
+      "relaxation": 0.5
+    },
+    "shrink_factors": [4, 2, 1],
+    "smoothing_sigmas_mm": [2.0, 1.0, 0.0],
+    "same_frame_initialization": "identity",
+    "different_frame_initialization": "moments",
+    "qc_far_mm": 30.0,
+    "qc_near_band_mm": [5.0, 30.0],
+    "acceptance_policy": "PENDING: calibrate on training patients only and freeze before registering validation/test targets"
+  },
+  "text": {
+    "organ": "early postoperative brain T1ce mri",
+    "class_names": {"1": "necrosis", "2": "peritumoral signal alteration", "3": "enhancing tumor"},
+    "empty_kind": "no annotated compartment",
+    "image_template": "a photo of {organ} image, with {kind}.",
+    "mask_template": "a photo of {organ} label, with {kind}."
+  },
+  "codec": {
+    "name": "scalar_id_over_max_rgb",
+    "max_id": 3
+  },
+  "representation_gate": {
+    "id3_macro_dice_min": 0.90,
+    "id3_macro_lesion_recall_min": 0.95,
+    "spurious_id3_ml_per_negative_patient_max": 0.01,
+    "unsupported_id1_ml_per_patient_max": 0.01,
+    "sample_seeds": [11, 22, 33]
+  },
+  "evaluation": {
+    "primary_roi_dilation_mm": 10.0,
+    "stable_roi_dilation_mm": 30.0,
+    "meaningful_delta": 0.01,
+    "stable_added_mae_upper_ci_max": 0.005,
+    "roi_support": {
+      "rule": "restrict R_p and S_p to observed registered target support; report the excluded fraction; NA above the cap; non-finite output inside stays NA",
+      "max_excluded_fraction": 0.05,
+      "amended": "2026-11-03, before any model scoring; user decision after training-only copy-control QC"
+    },
+    "bootstrap": {"resamples": 10000, "seed": 20261103, "confidence": 0.95},
+    "lesions": {"connectivity": 26, "min_iou": 0.10, "tiny_ml": 0.1},
+    "ssim": {"window": 7, "data_range": 1.0, "support_erosion_px": 3, "k1": 0.01, "k2": 0.03},
+    "generation_seeds": [11, 22, 33]
+  },
+  "model": {
+    "base_in_channels": 4,
+    "condition_channels": {"z_pre": 4, "m_pre": 3},
+    "expanded_in_channels": 11,
+    "out_channels": 4,
+    "mask_fraction_cell_px": 8
+  },
+  "training": {
+    "optimizer": "AdamW",
+    "learning_rate": 1e-05,
+    "weight_decay": 0.01,
+    "effective_batch_slice_pairs": 20,
+    "pilot_steps": 1000,
+    "checkpoint_every": 500,
+    "train_seed": 2026,
+    "replication_seeds": [2027, 2028],
+    "positive_pool_probability": 0.5
+  },
+  "sampling": {
+    "num_inference_steps": 50,
+    "guidance_scale": 7.5
+  }
+}

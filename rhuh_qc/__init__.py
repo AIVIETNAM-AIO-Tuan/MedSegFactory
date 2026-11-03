@@ -19,6 +19,7 @@ from .dicom import (
 )
 from .visualization import orthogonal_display, plot_triptych, render_triptych_png
 from .widgets import create_nifti_viewer
+from .browser_viewer import export_nifti_viewer
 
 __all__ = [
     "MODALITIES",
@@ -29,6 +30,7 @@ __all__ = [
     "checked_labels",
     "create_nifti_viewer",
     "discover_cases",
+    "export_nifti_viewer",
     "inventory_dicom_zips",
     "load_dicom_folder",
     "load_dicom_zip",
