@@ -56,8 +56,12 @@ Decisions taken later on 2026-11-03 (see Event.md): acceptance policy frozen
 (5% cap; copy controls v2 score all 24 patients), SD 1.5 license accepted, and
 RHUH-derived files allowed on Google Drive/Colab (user-attested).
 
+Validation export under the frozen policy: 3/6 accepted, 3/6 quarantined
+automatically (1 accepted patient has residual tumor). Code is on the fork's
+branch `exp-2026-001-implementation`; Colab runner `notebooks/RHUH_GBM_Colab.ipynb`.
+
 Next smallest steps:
-1. Get the code into Colab (push code-only to GitHub, or copy the repository to Drive) and copy the private `data/RHUH-GBM/synthesis/` outputs to Drive.
+1. Copy the private `data/RHUH-GBM/synthesis/` folder to Drive `MyDrive/RHUH-GBM/synthesis/` and run the Colab runner.
 2. On the Colab RTX 6000: confirm the GPU, install a matching torch build, run the model tests once, then run the representation gate (~minutes on GPU vs ~12 h on this CPU).
 3. Register/export the validation patients under the frozen policy; keep test sealed.
 4. Load the MedSegFactory checkpoint strictly and check adapter equivalence on the real model.

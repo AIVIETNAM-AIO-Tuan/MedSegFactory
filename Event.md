@@ -98,8 +98,17 @@ gates; no diffusion training, generation, validation or test scoring.
   2.9 s per slice, so the gate (~3,700 slices x 4 paths, ~12 h here) is planned on the GPU.
 - The user stated that RHUH-derived files may be stored on Google Drive and
   processed in Colab (user-attested; the license text was not independently
-  reviewed here). Training GPU: user-reported RTX 6000, to be confirmed on the
-  Colab runtime.
+  reviewed here). Training GPU: user-reported RTX PRO 6000 Blackwell, 96 GB,
+  to be confirmed on the Colab runtime.
+- Validation targets registered/exported under frozen policy v1: 6 processed,
+  3 accepted and 3 quarantined automatically (far-region correlation below 0.5);
+  1 of the 3 accepted has residual enhancing tumor. Test remains sealed.
+- Rigid registration is now the main bottleneck: 5/28 training and 3/6
+  validation pairs flagged. An affine variant would be calibrated on training
+  only and frozen as policy v2, then re-applied unchanged to every role.
+- Code pushed only to the user's fork (branch exp-2026-001-implementation);
+  nothing was pushed to the original repository. README.md and the QC notebook
+  (which has saved outputs listing patient IDs) were left uncommitted.
 
 ## 2026-11-03 — Ignore graphify output
 
