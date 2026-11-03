@@ -80,9 +80,15 @@ Data/cache/sampler path switched to the selected representation; MRI map-back
 rule fixed. Resampling-only floor: MAE ~0.009 in R_p and S_p. Stage 3 checks
 are implemented and CPU-tested.
 
+Stage 3 on Colab: strict checkpoint load passed (0 missing/unexpected, 946 M
+parameters); real-data step, gradients, frozen encoders, checkpoint round trip
+and sampler wiring passed. Adapter equivalence difference was 0.0024
+(likely TF32); to confirm with TF32 off. Profile: bf16 microbatch 4 pairs, 70 GiB
+and 0.48 s per microbatch.
+
 Next smallest steps:
-1. Run `notebooks/RHUH_GBM_Colab_stage3.ipynb` on Colab: strict checkpoint load, 4->11 equivalence, memory/speed profile at 64x64 latents, one real step, checkpoint round trip, sampler check.
-2. With those numbers, fix the microbatch/precision and request approval for Stage 4 (overfit ~16 training slices).
+1. Confirm adapter equivalence with TF32 disabled.
+2. Stage 4 (needs approval): overfit about 16 training slices with bf16, microbatch 4, and predeclared checks.
 3. Optional: affine registration variant (policy v2) to recover quarantined pairs.
 2. On the Colab RTX 6000: confirm the GPU, install a matching torch build, run the model tests once, then run the representation gate (~minutes on GPU vs ~12 h on this CPU).
 3. Register/export the validation patients under the frozen policy; keep test sealed.

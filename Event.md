@@ -206,6 +206,33 @@ gates; no diffusion training, generation, validation or test scoring.
   Colab runner `notebooks/RHUH_GBM_Colab_stage3.ipynb`. Not training.
   Local suite: 201 passed, 5 subtests.
 
+## 2026-11-03 — Stage 3 results (Colab, RTX PRO 6000 Blackwell; commit afae5da)
+
+- Checkpoint `JohnWeck/StableDiffusion/checkpoint-300.pth`, sha256 5d47436f...,
+  repository license field apache-2.0 (the SD 1.5 base terms still apply).
+  Strict load into the vendored 4-channel UNet: 814 tensors, 0 missing,
+  0 unexpected, 128 JCA tensors, 946,266,244 parameters.
+- Adapter equivalence at 64x64 latents: max |difference| 0.0024 against outputs
+  up to 4.45 (relative ~5e-4). This is likely GPU TF32 convolution rounding
+  with 4 vs 11 input channels; to confirm with TF32 disabled before training.
+- Profile, one optimizer step with full UNet and AdamW, random inputs:
+  - bf16 autocast: microbatch 1/2/4 pairs at 34.1/46.1/70.2 GiB and
+    0.19/0.28/0.48 s; 6 pairs OOM.
+  - fp32: 1/2/4/6 pairs at 32.8/41.6/62.8/84.0 GiB and 0.26/0.41/0.71/1.04 s;
+    8 pairs OOM.
+  - bf16 is about 1.5x faster but uses more memory: autocast weight copies,
+    plus the JCA processor builds and keeps full attention maps.
+- Real-data step (2 training patients, bf16): loss 0.0122, finite. The added
+  conv_in columns and all 128 JCA tensors received gradients; frozen VAE/CLIP
+  had none.
+- Checkpoint round trip: parameters identical; file 11.36 GB with optimizer state.
+- Sampler check: [1, 512, 512], finite, range [0, 1], decoded IDs 0-3. Before
+  fine-tuning the mask stream still produces the checkpoint's gray-level masks,
+  so the class-RGB decoder yields arbitrary IDs including ID 1. This is a wiring
+  check only.
+- Stage 3 status: passed, except that adapter equivalence must be confirmed
+  with TF32 off.
+
 ## 2026-11-03 — Ignore graphify output
 
 User requested exclusion of the graphify folder from Git. Added the existing
