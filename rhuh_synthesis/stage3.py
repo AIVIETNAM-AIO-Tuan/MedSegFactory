@@ -12,6 +12,7 @@ Functions take already-built models so they can be tested on CPU with tiny rando
 models; the Colab Stage 3 notebook calls them with the real weights.
 """
 
+import contextlib
 import copy
 import time
 
@@ -63,10 +64,34 @@ def load_reference_unet(unet_class, unet_config, checkpoint_path):
     return unet, report
 
 
+@contextlib.contextmanager
+def tf32_disabled():
+    """Force IEEE fp32 for CUDA matmuls and cuDNN convolutions; restore the flags after."""
+    saved = torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
+    try:
+        yield
+    finally:
+        torch.backends.cuda.matmul.allow_tf32, torch.backends.cudnn.allow_tf32 = saved
+
+
 @torch.no_grad()
-def adapter_equivalence(unet4, *, latent_hw, cross_dim, device, batch=1, seed=0):
-    """Max |output difference| between the 4-channel model and its 11-channel expansion."""
+def adapter_equivalence(unet4, *, latent_hw, cross_dim, device, batch=1, seed=0, tf32=True):
+    """Max |output difference| between the 4-channel model and its 11-channel expansion.
+
+    ``tf32=False`` runs both forward passes under ``tf32_disabled`` so the
+    difference is not TF32 rounding. The report also checks the expanded
+    ``conv_in`` exactly: copied weights and bias identical, added weights zero.
+    """
     unet11 = expand_conv_in(copy.deepcopy(unet4), 11)
+    weights_ok = {
+        "copied_weights_identical": bool(
+            torch.equal(unet11.conv_in.weight[:, :4], unet4.conv_in.weight)
+            and torch.equal(unet11.conv_in.bias, unet4.conv_in.bias)
+        ),
+        "added_weights_zero": bool((unet11.conv_in.weight[:, 4:] == 0).all()),
+    }
     generator = torch.Generator().manual_seed(seed)
     images = torch.randn(batch, 4, *latent_hw, generator=generator)
     masks = torch.randn(batch, 4, *latent_hw, generator=generator)
@@ -76,14 +101,19 @@ def adapter_equivalence(unet4, *, latent_hw, cross_dim, device, batch=1, seed=0)
     timesteps = torch.full((2 * batch,), 500, dtype=torch.long)
     unet4.to(device).eval()
     unet11.to(device).eval()
-    plain = unet4(torch.cat([images, masks]).to(device), timesteps.to(device), text.to(device)).sample
-    stacked = stack_unet_input(images, masks, z_pre, m_pre).to(device)
-    expanded = unet11(stacked, timesteps.to(device), text.to(device)).sample
+    with tf32_disabled() if not tf32 else contextlib.nullcontext():
+        plain = unet4(torch.cat([images, masks]).to(device), timesteps.to(device), text.to(device)).sample
+        stacked = stack_unet_input(images, masks, z_pre, m_pre).to(device)
+        expanded = unet11(stacked, timesteps.to(device), text.to(device)).sample
     del unet11
+    difference, scale = float((plain - expanded).abs().max()), float(plain.abs().max())
     return {
-        "max_abs_difference": float((plain - expanded).abs().max()),
-        "max_abs_output": float(plain.abs().max()),
+        "tf32": bool(tf32),
+        "max_abs_difference": difference,
+        "max_abs_output": scale,
+        "relative_difference": difference / scale if scale > 0 else float("nan"),
         "out_channels": int(expanded.shape[1]),
+        **weights_ok,
     }
 
 

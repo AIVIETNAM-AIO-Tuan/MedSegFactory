@@ -370,8 +370,12 @@ def train(
     checkpoint_every=None,
     config_sha256="",
     start_step=0,
+    precision="fp32",
 ):
     """Run ``steps`` optimizer steps after ``start_step``; return the final global step.
+
+    ``precision="bf16"`` wraps each microbatch's forward pass and loss (not the
+    backward pass or the optimizer) in bf16 autocast; bf16 needs no scaler.
 
     Each optimizer step accumulates gradients over ``accumulation`` microbatches
     of ``microbatch`` sampler draws (effective batch ``microbatch * accumulation``
@@ -384,7 +388,7 @@ def train(
     With ``checkpoint_every``, ``checkpoint-<step>.pt`` is saved in
     ``checkpoint_dir`` whenever the global step is a multiple of it. Resume with
     ``start_step=load_checkpoint(...)`` and the same ``log_path``. The UNet is
-    set to train mode; no autocast or gradient scaler is applied.
+    set to train mode; no gradient scaler is applied.
     """
     steps, accumulation = operator.index(steps), operator.index(accumulation)
     microbatch, start_step = operator.index(microbatch), operator.index(start_step)
@@ -396,6 +400,9 @@ def train(
         checkpoint_every = operator.index(checkpoint_every)
         if checkpoint_every < 1 or checkpoint_dir is None:
             raise ValueError("checkpoint_every needs a value >= 1 and a checkpoint_dir")
+    if precision not in ("fp32", "bf16"):
+        raise ValueError(f"precision must be 'fp32' or 'bf16', got {precision!r}")
+    device_type = next(unet.parameters()).device.type
     log_path = Path(log_path)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     unet.train()
@@ -406,7 +413,10 @@ def train(
         optimizer.zero_grad(set_to_none=True)
         losses = []
         for _ in range(accumulation):
-            loss = train_step(unet, cache, sampler.batch(microbatch), noise_scheduler, rng=rng, generator=generator)
+            with torch.autocast(device_type=device_type, dtype=torch.bfloat16, enabled=precision == "bf16"):
+                loss = train_step(
+                    unet, cache, sampler.batch(microbatch), noise_scheduler, rng=rng, generator=generator
+                )
             value = float(loss.detach())
             if not math.isfinite(value):
                 _append_json_line(log_path, {"step": current, "loss": None, "finite": False})

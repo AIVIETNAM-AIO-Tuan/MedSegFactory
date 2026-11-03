@@ -15,6 +15,10 @@
 /.understand-anything/
 /graphify-out/
 
+# Colab notebook copies saved with outputs (may show patient images or IDs)
+/notebooks/*ipynb.ipynb
+/notebooks/runs/
+
 # Python and notebook runtime artifacts
 __pycache__/
 *.py[cod]

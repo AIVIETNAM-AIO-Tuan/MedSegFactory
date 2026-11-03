@@ -149,5 +149,38 @@
   "sampling": {
     "num_inference_steps": 50,
     "guidance_scale": 7.5
+  },
+  "stage4_overfit": {
+    "purpose": "sanity only: can the pipeline fit 16 training slices; no quality, generalization or clinical claim",
+    "fixed": "2026-11-03, before any Stage 4 run",
+    "preflight_adapter_equivalence": {"tf32": false, "relative_difference_max": 1e-05, "copied_weights_identical": true, "added_weights_zero": true},
+    "patients": {
+      "positive": 2,
+      "negative": 2,
+      "rule": "training patients accepted by the frozen registration policy, ranked by exported ID-3 voxel count (positive) or ID-1 + ID-2 count (ID-3-negative), ties by patient ID; the first that can supply all four slices are used, skipped patients are recorded"
+    },
+    "slices_per_patient": {"labeled": 2, "label_free": 2, "min_gap": 3, "min_brain_fraction": 0.5},
+    "steps": 500,
+    "evaluate_at": [0, 250, 500],
+    "microbatch_pairs": 4,
+    "accumulation": 5,
+    "precision": "bf16",
+    "evaluation_precision": "fp32",
+    "train_seed": 2026,
+    "eval_loss": {"timesteps": [100, 300, 500, 700, 900], "noise_seed": 20261103, "batch": 4},
+    "generation": {
+      "seed": 11,
+      "batch_pairs": 2,
+      "shifted_condition_control": "slice k of patient i takes the pre-op conditions of slice k of patient i + 1 and keeps its own text; final checkpoint only"
+    },
+    "criteria": {
+      "eval_loss": "final < step 0 for the image and the mask stream",
+      "image_mae": "final mean brain MAE < step-0 mean, < copy-control mean and < shifted-condition mean",
+      "id2_dice_min": 0.5,
+      "id3_slices_overlapped_min": 3,
+      "label_free_labeled_mm2_max": 10.0,
+      "invented_id1_mm2_max": 10.0
+    },
+    "decision": "PASS if every check holds; otherwise ITERATE: record the failed checks, keep the slice set, rerun under a new run tag with one change declared before the rerun"
   }
 }

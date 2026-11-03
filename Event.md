@@ -238,3 +238,47 @@ gates; no diffusion training, generation, validation or test scoring.
 User requested exclusion of the graphify folder from Git. Added the existing
 root directory /graphify-out/ to .gitignore. git check-ignore confirmed the rule;
 git ls-files found no tracked files under that directory. No files were deleted.
+
+## 2026-11-03 — Stage 4 preregistered and prepared (not run)
+
+- Approved by the user. Settings and pass rules were fixed in the config block
+  `stage4_overfit` before any Stage 4 model run.
+- Training loop: optional bf16 autocast (`train(..., precision="bf16")`) around
+  each microbatch's forward pass and loss. Backward and AdamW act on the fp32
+  weights, with no scaler.
+- Preflight: `adapter_equivalence(..., tf32=False)` disables TF32 for matmuls
+  and cuDNN during the check. It also checks the expanded conv_in exactly:
+  copied weights and bias identical, added weights zero. Limit: relative
+  difference <= 1e-5.
+- Overfit set: 16 training slices from 4 accepted training patients.
+  - Two ID-3-positive patients ranked by ID-3 volume give 2 ID-3 slices each.
+  - Two ID-3-negative patients ranked by ID-1 + ID-2 volume give 2 labelled
+    slices each.
+  - Every patient also gives 2 label-free slices: no target or pre-op label,
+    at least half of the largest brain slice.
+- Selection rule amended once, during a local dry run of the selection and
+  before any model run. The rank-2 ID-3 patient has only one large label-free
+  slice. Patients that cannot supply all four slices are now skipped in rank
+  order, and the skip is recorded.
+- Dry-run result: positive ranks 1 and 3, negative ranks 1 and 2.
+  - ID-3 slices carry 84-190 mm2 of ID 3.
+  - No selected slice has ID 1.
+  - All 16 slices have full target support.
+  - Copy-control MAE is 0.05-0.13 per slice.
+- Schedule: 500 steps, 4 pairs x 5 accumulation, lr 1e-5, seed 2026.
+  Evaluations at steps 0/250/500 in fp32:
+  - fixed-noise loss per stream at t = 100-900;
+  - DDIM 50 steps, guidance 7.5, seed 11, one generation per slice;
+  - a shifted-condition control at step 500: pre-op inputs from another
+    patient, own text kept.
+- PASS needs every check: finite training losses; both eval losses below step
+  0; final image MAE below step 0, below the copy control and below the shifted
+  control; mean ID-2 Dice >= 0.5; ID 3 overlapped on >= 3 of 4 slices; mean
+  label area on label-free slices <= 10 mm2; mean invented ID 1 <= 10 mm2.
+  Otherwise ITERATE under a new run tag, with one change declared before the
+  rerun.
+- The reference JCA processors keep their last attention maps. Evaluation now
+  releases them so they don't hold GPU memory into training.
+- Local smoke run of the notebook glue (CPU, tiny random models, 4 steps) found
+  one bug before Colab: eval-loss keys mixed integers and strings, which broke
+  the sorted-key JSON record. Fixed.

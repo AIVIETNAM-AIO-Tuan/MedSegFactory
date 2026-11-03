@@ -86,13 +86,21 @@ and sampler wiring passed. Adapter equivalence difference was 0.0024
 (likely TF32); to confirm with TF32 off. Profile: bf16 microbatch 4 pairs, 70 GiB
 and 0.48 s per microbatch.
 
+Stage 4 prepared (user-approved), NOT RUN:
+- Preregistered config block `stage4_overfit`.
+- bf16 option in the training loop.
+- TF32-off adapter preflight.
+- `rhuh_synthesis/overfit.py`, CPU-tested.
+- Colab runner `notebooks/RHUH_GBM_Colab_stage4.ipynb`.
+The local dry run selected 16 training slices: 4 ID 3, 4 labelled without ID 3,
+8 label-free, all with full target support. One ID-3 patient was skipped
+because it could not supply two label-free slices. The notebook glue ran end to
+end on CPU with tiny random models.
+
 Next smallest steps:
-1. Confirm adapter equivalence with TF32 disabled.
-2. Stage 4 (needs approval): overfit about 16 training slices with bf16, microbatch 4, and predeclared checks.
-3. Optional: affine registration variant (policy v2) to recover quarantined pairs.
-2. On the Colab RTX 6000: confirm the GPU, install a matching torch build, run the model tests once, then run the representation gate (~minutes on GPU vs ~12 h on this CPU).
-3. Register/export the validation patients under the frozen policy; keep test sealed.
-4. Load the MedSegFactory checkpoint strictly and check adapter equivalence on the real model.
+1. Run the Stage 4 notebook on Colab (about 35 minutes). Then review the decision, the per-slice scores and the PNG grids.
+2. Stage 5 (1,000-step pilot): only after a Stage 4 PASS and explicit approval.
+3. Optional: an affine registration variant (policy v2) to recover quarantined pairs.
 
 ## 2026-11-03 — Git hygiene
 
