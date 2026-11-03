@@ -169,6 +169,25 @@ gates; no diffusion training, generation, validation or test scoring.
 - New Colab runner `notebooks/RHUH_GBM_Colab_crop_gate.ipynb`; its test step is
   optional and uses any snapshot already on Drive.
 
+## 2026-11-03 — Representation selected: crop192_512_class_rgb
+
+- Colab gate (24 accepted training patients, report sha256 7b2ed78f): PASS on every
+  path. Mean and the three sampled paths gave identical results: ID-3 Dice
+  0.943 (>=0.90), macro lesion recall 0.971 (>=0.95), pooled 13/14 lesions,
+  spurious ID 3 0.0002 mL, unsupported ID 1 0.0000 mL. Crop coverage: 24/24 fully
+  covered. The one missed lesion is listed in the private report.
+- By the preregistered order, crop192_512_class_rgb is selected (the earlier
+  variants failed). The gate authorizes technical iteration, not clinical acceptance.
+- Consequences to implement before training:
+  - Use the per-patient pre-op crop for the image and mask streams.
+  - Encode targets with the class-separated RGB codec.
+  - Compute pre-op mask fractions on the crop grid (3 mm cells).
+  - Run the UNet at a 64x64 latent grid; profile JCA memory first.
+  - Fix the rule for mapping generated MRI back to the 1 mm grid before any scoring.
+  - Note that the released checkpoint learned 256 px gray-level masks.
+- Colab ran the older tests snapshot (187 tests); the laptop suite including
+  the crop tests passed (191).
+
 ## 2026-11-03 — Ignore graphify output
 
 User requested exclusion of the graphify folder from Git. Added the existing

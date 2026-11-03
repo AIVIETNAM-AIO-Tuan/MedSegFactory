@@ -73,8 +73,13 @@ Fallback gates on Colab: none passed. Best was 512_class_rgb (Dice 0.859 vs 0.90
 recall, spurious ID 3 and ID 1 all pass). The crop192_512_class_rgb addendum is
 implemented; local suite 191 passed, 5 subtests.
 
+Representation gate PASSED for crop192_512_class_rgb (Dice 0.943, lesion recall
+0.971, 13/14 lesions, no spurious ID 1/ID 3, 24/24 patients covered); selected.
+
 Next smallest steps:
-1. Run `notebooks/RHUH_GBM_Colab_crop_gate.ipynb` on Colab (no uploads needed) and apply the selection rule.
+1. Switch the data/cache/sampler path to the selected representation (pre-op crop, 512 px, class-RGB targets) and fix the MRI map-back rule before scoring.
+2. Stage 3 on Colab: strict MedSegFactory checkpoint load, 4->11 equivalence on the real model, memory/throughput profile at 64x64 latents, one optimizer step.
+3. Optional: affine registration variant (policy v2) to recover quarantined pairs.
 2. On the Colab RTX 6000: confirm the GPU, install a matching torch build, run the model tests once, then run the representation gate (~minutes on GPU vs ~12 h on this CPU).
 3. Register/export the validation patients under the frozen policy; keep test sealed.
 4. Load the MedSegFactory checkpoint strictly and check adapter equivalence on the real model.
