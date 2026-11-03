@@ -134,9 +134,17 @@ Stage 4 r3 prepared (user-designed), NOT RUN.
   `stage4_r3_init_sources`.
 - Runner: `notebooks/RHUH_GBM_Colab_stage4_r3.ipynb`.
 
+Stage 4 r3 on Colab (commit 4943d15): preregistered verdict
+`image_anchor_insufficient`.
+- The pre-op image start nearly matched the oracle image start (whole-slice
+  MAE 0.026 vs 0.023, pure noise 0.239; right patient 14/16 vs 15/16, post-hoc).
+- Masks from pure noise matched their own slice on 7/16 only.
+- Step-500 UNet weights are saved on Drive, so sampling-only tests need no
+  retraining.
+
 Next smallest steps:
-1. Run Stage 4 r3 on Colab (about 33 minutes). Its verdict decides between a
-   pre-op-initialized editing arm and a training change.
+1. Choose r4 (user decision). Proposed: a sampling-only test from the saved
+   weights that also starts the mask stream from the noised pre-op mask.
 2. Stage 5 (1,000-step pilot) needs a Stage 4 PASS, or an approved deviation.
 3. Optional: an affine registration variant (policy v2) to recover quarantined pairs.
 

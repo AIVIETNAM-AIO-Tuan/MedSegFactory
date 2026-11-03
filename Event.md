@@ -471,3 +471,38 @@ git ls-files found no tracked files under that directory. No files were deleted.
   `notebooks/RHUH_GBM_Colab_stage4_r3.ipynb`. Optional `SAVE_UNET_TO_DRIVE`
   (about 3.8 GB) is off by default.
 - Tests: 23 overfit tests; 5/5 planted mutations caught.
+
+## 2026-11-04 — Stage 4 r3 result (Colab; commit 4943d15): verdict image_anchor_insufficient
+
+- Training repeated a third time. Standard step-500 scores reproduced (brain
+  MAE 0.136; whole-slice MAE 0.239). ITERATE, with the same failed checks.
+  The step-500 UNet weights are saved in the r3 run folder on Drive (3.5 GiB).
+- Image-stream starts at t = 981, mask stream from pure noise in every arm:
+
+  | Arm | whole-slice MAE | background MAE | own slice top-1 | own mask top-1 | label-free slices with labels |
+  |---|---|---|---|---|---|
+  | pure noise | 0.239 | 0.292 | 1/16 | 4/16 | 1,078 mm2 mean |
+  | own post-op (oracle) | 0.023 | 0.008 | 10/16 | 7/16 | 5/8 |
+  | own pre-op | 0.026 | 0.008 | 8/16 | 7/16 | 6/8 |
+  | wrong-patient pre-op | 0.056 | 0.031 | 6/16 | 6/16 | 6/8 |
+
+- Preregistered readings:
+  - oracle top-1 10 < 12, so the oracle image anchor does not "rescue";
+  - pre-op top-1 8 < 12 although it closes 98.5% of the MAE gap, so it does
+    not "work";
+  - specificity 8 - 6 = 2 < 8;
+  - verdict: `image_anchor_insufficient`.
+- Post-hoc breakdown (NOT preregistered):
+  - Most top-1 misses are the same patient's neighbouring slice. At patient
+    level the generated image matched the right patient on 15/16 (oracle),
+    14/16 (own pre-op) and 9/16 (wrong-patient pre-op); the wrong-patient
+    start pulled 5/16 to that patient.
+  - The grid shows correct anatomy and black backgrounds with the pre-op
+    start. For the resection patient, the pre-op tumor image led to the
+    post-op cavity.
+  - With the mask stream from pure noise, masks matched their own slice on
+    7/16 even with the oracle image, and image-mask pairs often disagree. In
+    r2, starting both streams from the target gave near-perfect masks.
+- Reading: the image anchor works from either source; the mask stream does
+  not follow its image. All on 16 memorized training slices, so nothing about
+  new patients is shown.
