@@ -227,5 +227,30 @@
     "reading": {"retrieval_min": 12, "gap_closed_min": 0.5, "specificity_margin": 8},
     "reading_rules": "preop anchor works: own-pre-op retrieval >= 12/16 and it closes >= half the whole-slice MAE gap between pure noise and the oracle start; patient-specific: its retrieval exceeds the wrong-patient arm's by >= 8",
     "decision": "diagnostic only, no PASS. preop_anchor_justified: a pre-op-initialized editing baseline becomes justified (declared as a new arm before use); only_future_target_rescues: stronger evidence that training must change; image_anchor_insufficient: the image start alone does not rescue generation"
+  },
+  "stage4_r4_pair_start": {
+    "purpose": "sampling-only test from the saved r3 step-500 weights: does starting the mask stream from the noised pre-op mask, together with the pre-op image, make the masks follow while the image anchor is kept?",
+    "fixed": "2026-11-04, after r3 and before r4",
+    "weights": "stage4/r3/unet_step000500.pt (the r3 step-500 UNet, saved after the r3 arms); loaded strictly, SHA256 recorded",
+    "slices": "the stage4_overfit selection (the same 16 training slices)",
+    "start_timestep": "first DDIM timestep (981)",
+    "arms": {
+      "pure_noise": "both streams from pure noise (r3 reference)",
+      "image_own_preop": "image from own pre-op latent, mask from pure noise (r3 replicate)",
+      "pair_own_preop": "image from own pre-op latent and mask from own pre-op mask latent (class-RGB codec, VAE posterior mean x scaling factor); available at inference",
+      "pair_own_postop": "own post-op image and mask latents; oracle diagnostic, never a result",
+      "pair_wrong_patient_preop": "pre-op image and mask latents of the shifted-condition slice (another patient); negative control"
+    },
+    "kept_fixed": "the same seeded noise, start timestep, own text and own concatenated pre-op conditions in every arm; guidance 7.5, 50 DDIM steps",
+    "added_metrics": "patient_top1 / mask_patient_top1: generations whose nearest target (whole-slice MAE) or nearest training mask belongs to the slice's own patient",
+    "reading": {
+      "r3_slice_mae": {"pure_noise": 0.2393, "image_own_preop": 0.0264},
+      "r3_tolerance": 0.005,
+      "patient_top1_min": 14,
+      "label_free_mm2_max": 100.0,
+      "image_mae_ratio_max": 1.25,
+      "specificity_margin": 6
+    },
+    "decision": "diagnostic only, no PASS. preop_pair_start_justified needs: the weights reproduce r3 (both reference arms within 0.005 whole-slice MAE); masks follow (mask_patient_top1 >= 14 and label-free labels <= 100 mm2 mean); the image anchor is kept (patient_top1 >= 14 and whole-slice MAE <= 1.25 x the image-only arm); the start is patient-specific (patient_top1 exceeds the wrong-patient arm by >= 6). Then the pre-op-pair start is declared as a Stage 5 sampling arm next to pure noise"
   }
 }

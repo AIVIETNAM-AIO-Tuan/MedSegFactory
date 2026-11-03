@@ -142,9 +142,15 @@ Stage 4 r3 on Colab (commit 4943d15): preregistered verdict
 - Step-500 UNet weights are saved on Drive, so sampling-only tests need no
   retraining.
 
+Stage 4 r4 prepared (user-approved), NOT RUN.
+- Sampling only from the saved r3 weights.
+- Compares starting both streams from the pre-op pair against the pre-op
+  image alone, the oracle post-op pair and a wrong patient's pre-op pair.
+- Config block `stage4_r4_pair_start`; runner
+  `notebooks/RHUH_GBM_Colab_stage4_r4.ipynb`.
+
 Next smallest steps:
-1. Choose r4 (user decision). Proposed: a sampling-only test from the saved
-   weights that also starts the mask stream from the noised pre-op mask.
+1. Run Stage 4 r4 on Colab (about 12 minutes, no training).
 2. Stage 5 (1,000-step pilot) needs a Stage 4 PASS, or an approved deviation.
 3. Optional: an affine registration variant (policy v2) to recover quarantined pairs.
 

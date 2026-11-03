@@ -506,3 +506,38 @@ git ls-files found no tracked files under that directory. No files were deleted.
 - Reading: the image anchor works from either source; the mask stream does
   not follow its image. All on 16 memorized training slices, so nothing about
   new patients is shown.
+
+## 2026-11-04 — Stage 4 r4 preregistered (pre-op pair start; sampling only; not run)
+
+- Approved by the user, who chose r4 before any longer training. Answer given:
+  more steps on 16 slices would not help. In r2 and r3, generation from pure
+  noise got worse between steps 250 and 500 while the loss kept falling, and
+  the oracle start already renders the slices almost exactly. Longer training
+  belongs in the Stage 5 pilot on all training slices.
+- Design (config block `stage4_r4_pair_start`): no training. The r3 step-500
+  weights are loaded strictly from the r3 run folder, with their SHA256
+  recorded. Same 16 slices. Starting arms at t = 981:
+  - pure noise and pre-op image only, both reproducing r3;
+  - pre-op image + pre-op mask, available at inference;
+  - post-op image + mask (oracle);
+  - a wrong patient's pre-op pair (control).
+  Noise, text and concatenated pre-op conditions are fixed in every arm.
+- New metrics, fixed now: `patient_top1` / `mask_patient_top1`, generations
+  whose nearest target or nearest training mask belongs to the slice's own
+  patient. They replace exact-slice retrieval as the deciding metric, because
+  r3 showed most exact misses were near-identical neighbouring slices. This
+  applies from r4 on; r3 keeps its own preregistered verdict.
+- Verdict `preop_pair_start_justified` needs, in order:
+  - the weights reproduce r3 (both reference arms within 0.005 whole-slice
+    MAE of r3);
+  - masks follow (`mask_patient_top1` >= 14 and label-free labels <= 100 mm2
+    mean);
+  - the image anchor is kept (`patient_top1` >= 14 and whole-slice MAE
+    <= 1.25 x the image-only arm);
+  - the start is patient-specific (`patient_top1` at least 6 above the
+    wrong-patient arm).
+- Code: `overfit.mask_latents`, `mix_start`, `generate(start_mask=...)`,
+  `summarize(groups=...)`, `load_trained_unet`, `pair_start_readings`. Runner:
+  `notebooks/RHUH_GBM_Colab_stage4_r4.ipynb`, about 12 minutes.
+- Tests: 29 overfit tests; 7/7 planted mutations caught. The CPU smoke run of
+  the notebook passed end to end, with the saved weights reloading identically.

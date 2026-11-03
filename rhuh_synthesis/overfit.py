@@ -26,6 +26,7 @@ import numpy as np
 import torch
 from diffusers.utils.torch_utils import randn_tensor
 
+from .codec import MASK_CODECS
 from .model import stack_unet_input
 from .sampling import decode_pair, sample_pairs
 
@@ -238,22 +239,69 @@ def image_start_latents(cache, items, source):
     return torch.stack([records[p]["image_mean"][z] for p, z in items]) * cache["scaling_factor"]
 
 
-def mix_image_start(noise, scheduler, timestep, image_clean):
-    """Replace the image rows of ``noise`` [2n, ...] by ``add_noise(image_clean, those rows, timestep)``.
+@torch.no_grad()
+def mask_latents(vae, labels, *, mask_codec, device="cpu", batch=8):
+    """Clean mask latents [N, 4, h, w] of label maps [N, H, W]: the target-mask encoding of the cache.
 
-    The mask rows stay pure noise.
+    ``codec.MASK_CODECS[mask_codec]`` encodes the labels, the VAE posterior mean
+    is taken (as ``build_feature_cache`` stores it) and scaled by the scaling factor.
+    """
+    encode = MASK_CODECS[mask_codec][0]
+    dtype = next(vae.parameters()).dtype
+    parts = []
+    for start in range(0, len(labels), batch):
+        x = torch.from_numpy(np.ascontiguousarray(encode(np.asarray(labels[start : start + batch]))))
+        parts.append(vae.encode(x.to(device=device, dtype=dtype)).latent_dist.mean.float().cpu())
+    return torch.cat(parts) * float(vae.config.scaling_factor)
+
+
+def mix_start(noise, scheduler, timestep, *, image_clean=None, mask_clean=None):
+    """Noise the image and/or mask rows of ``noise`` [2n, ...] from clean latents at ``timestep``.
+
+    Rows whose clean latents are None stay pure noise.
     """
     n = noise.shape[0] // 2
-    if noise.shape[0] != 2 * n or tuple(image_clean.shape) != tuple(noise[:n].shape):
-        raise ValueError(f"image_clean {tuple(image_clean.shape)} must match the image rows of {tuple(noise.shape)}")
-    steps = torch.full((n,), int(timestep), dtype=torch.long, device=noise.device)
-    image = scheduler.add_noise(image_clean.to(device=noise.device, dtype=noise.dtype), noise[:n], steps)
-    return torch.cat([image, noise[n:]])
+    if noise.shape[0] != 2 * n:
+        raise ValueError(f"noise needs an even number of rows, got {noise.shape[0]}")
+    rows = [noise[:n], noise[n:]]
+    for k, (stream, clean) in enumerate((("image", image_clean), ("mask", mask_clean))):
+        if clean is None:
+            continue
+        if tuple(clean.shape) != tuple(rows[k].shape):
+            raise ValueError(f"{stream}_clean {tuple(clean.shape)} must match the {stream} rows of {tuple(noise.shape)}")
+        steps = torch.full((n,), int(timestep), dtype=torch.long, device=noise.device)
+        rows[k] = scheduler.add_noise(clean.to(device=noise.device, dtype=noise.dtype), rows[k], steps)
+    return torch.cat(rows)
+
+
+def mix_image_start(noise, scheduler, timestep, image_clean):
+    """Image rows from ``add_noise(image_clean, ...)``; the mask rows stay pure noise."""
+    return mix_start(noise, scheduler, timestep, image_clean=image_clean)
+
+
+def load_trained_unet(unet4, path, *, device="cpu"):
+    """Expand ``unet4`` (in place) to 11 input channels and load saved Stage 4 weights strictly.
+
+    Returns ``(unet11 in eval mode on device, report)``; the report records
+    the file's SHA256, the tensor count and the added-adapter weight sum.
+    """
+    from .manifest import file_sha256
+    from .model import expand_conv_in
+
+    unet11 = expand_conv_in(unet4, 11)
+    state = torch.load(path, map_location="cpu", weights_only=True)
+    unet11.load_state_dict(state, strict=True)
+    report = {
+        "sha256": file_sha256(path),
+        "tensors": len(state),
+        "adapter_added_weight_abs_sum": float(unet11.conv_in.weight[:, 4:].detach().abs().sum()),
+    }
+    return unet11.to(device).eval(), report
 
 
 @torch.no_grad()
 def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidance_scale, seed, batch,
-             mask_codec, condition_items=None, start_from=None, start_image=None):
+             mask_codec, condition_items=None, start_from=None, start_image=None, start_mask=None):
     """Sample one pair per item; returns ``(images [N, H, W] in [0, 1], masks [N, H, W] uint8)``.
 
     Each item uses its own first prompt pair (empty-prompt guidance) and the
@@ -262,10 +310,10 @@ def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidanc
     so the same items and batch give the same noise at every checkpoint. With
     ``start_from`` (oracle diagnostic, never a result), sampling instead starts
     from ``start_latents`` of those items at the first sampling timestep, with
-    the same noise draws. ``start_image`` [N, 4, h, w] (clean image latents,
-    e.g. ``image_start_latents``) starts only the image stream that way; the
-    mask stream stays pure noise. Sets ``unet`` to eval mode and releases the
-    JCA attention maps afterwards.
+    the same noise draws. ``start_image`` / ``start_mask`` [N, 4, h, w] (clean
+    latents, e.g. ``image_start_latents`` / ``mask_latents``) start only that
+    stream that way; a stream without one stays pure noise. Sets ``unet`` to
+    eval mode and releases the JCA attention maps afterwards.
     """
     items = list(items)
     condition_items = items if condition_items is None else list(condition_items)
@@ -273,8 +321,9 @@ def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidanc
         raise ValueError("condition_items must match items")
     if start_from is not None and len(start_from) != len(items):
         raise ValueError("start_from must match items")
-    if start_image is not None and (start_from is not None or len(start_image) != len(items)):
-        raise ValueError("start_image must match items and cannot be combined with start_from")
+    for name, clean in (("start_image", start_image), ("start_mask", start_mask)):
+        if clean is not None and (start_from is not None or len(clean) != len(items)):
+            raise ValueError(f"{name} must match items and cannot be combined with start_from")
     reference = next(unet.parameters())
     device, dtype = reference.device, reference.dtype
     generator = torch.Generator().manual_seed(seed)
@@ -292,8 +341,12 @@ def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidanc
         if start_from is not None:
             initial = start_latents(cache, start_from[start : start + batch], initial, scheduler,
                                     scheduler.timesteps[0])
-        if start_image is not None:
-            initial = mix_image_start(initial, scheduler, scheduler.timesteps[0], start_image[start : start + batch])
+        if start_image is not None or start_mask is not None:
+            initial = mix_start(
+                initial, scheduler, scheduler.timesteps[0],
+                image_clean=None if start_image is None else start_image[start : start + batch],
+                mask_clean=None if start_mask is None else start_mask[start : start + batch],
+            )
         image_latents, mask_latents = sample_pairs(
             unet, scheduler, z_pre, m_pre, image_text, empty, mask_text, empty,
             num_inference_steps=num_inference_steps, guidance_scale=guidance_scale, generator=generator,
@@ -376,9 +429,14 @@ def _mean(values):
     return float(np.mean(values)) if values else None
 
 
-def summarize(rows, categories):
-    """Means used by the preregistered criteria (None when not evaluable)."""
-    return {
+def summarize(rows, categories, groups=None):
+    """Means used by the preregistered criteria (None when not evaluable).
+
+    With ``groups`` (one patient key per slice, in target order) it adds
+    ``patient_top1``/``mask_patient_top1``: generations whose nearest target or
+    nearest training mask belongs to the slice's own patient.
+    """
+    summary = {
         "image_mae_mean": _mean(r["image_mae"] for r in rows),
         "copy_mae_mean": _mean(r["copy_mae"] for r in rows),
         "id2_dice_mean": _mean(r["id2_dice"] for r in rows),
@@ -396,6 +454,10 @@ def summarize(rows, categories):
         "mask_retrieval_top1": sum(r.get("nearest_mask") == k for k, r in enumerate(rows)),
         "labels_inside_foreground_mean": _mean(r.get("labels_inside_foreground") for r in rows),
     }
+    if groups is not None:
+        summary["patient_top1"] = sum(groups[r["nearest_target"]] == groups[k] for k, r in enumerate(rows))
+        summary["mask_patient_top1"] = sum(groups[r["nearest_mask"]] == groups[k] for k, r in enumerate(rows))
+    return summary
 
 
 def follows_source(rows, sources, items):
@@ -488,6 +550,48 @@ def init_source_readings(final, arms, reading):
         "oracle_image_anchor_rescues": oracle_rescues,
         "preop_anchor_works": pre_works,
         "preop_anchor_is_patient_specific": specific,
+        "verdict": verdict,
+    }
+
+
+def pair_start_readings(arms, reading):
+    """Preregistered r4 readings: does the pre-op pair start anchor both streams?
+
+    ``arms`` maps the r4 arm names to evaluations with ``summary`` (from
+    ``summarize(..., groups=...)``). Checks, in order: the loaded weights
+    reproduce r3, the masks follow, the image anchor is kept, the start is
+    patient-specific. Diagnostic only.
+    """
+    summary = {name: arm["summary"] for name, arm in arms.items()}
+    pair, wrong = summary["pair_own_preop"], summary["pair_wrong_patient_preop"]
+    reproduced = {name: summary[name]["slice_mae_mean"] for name in reading["r3_slice_mae"]}
+    reproduces = all(abs(value - reading["r3_slice_mae"][name]) <= reading["r3_tolerance"]
+                     for name, value in reproduced.items())
+    masks_follow = (pair["mask_patient_top1"] >= reading["patient_top1_min"]
+                    and pair["label_free_labeled_mm2_mean"] <= reading["label_free_mm2_max"])
+    image_kept = (pair["patient_top1"] >= reading["patient_top1_min"]
+                  and pair["slice_mae_mean"] <= reading["image_mae_ratio_max"] * summary["image_own_preop"]["slice_mae_mean"])
+    specific = pair["patient_top1"] - wrong["patient_top1"] >= reading["specificity_margin"]
+    if not reproduces:
+        verdict = "weights_did_not_reproduce"
+    elif not masks_follow:
+        verdict = "masks_still_unanchored"
+    elif not image_kept:
+        verdict = "image_degraded"
+    elif not specific:
+        verdict = "not_patient_specific"
+    else:
+        verdict = "preop_pair_start_justified"
+    return {
+        "reproduced_slice_mae": reproduced,
+        "weights_reproduce_r3": reproduces,
+        "pair_mask_patient_top1": pair["mask_patient_top1"],
+        "pair_label_free_labeled_mm2_mean": pair["label_free_labeled_mm2_mean"],
+        "pair_patient_top1": pair["patient_top1"],
+        "wrong_patient_patient_top1": wrong["patient_top1"],
+        "masks_follow": masks_follow,
+        "image_kept": image_kept,
+        "patient_specific": specific,
         "verdict": verdict,
     }
 
