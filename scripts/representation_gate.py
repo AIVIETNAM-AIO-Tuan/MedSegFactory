@@ -16,9 +16,12 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
+from rhuh_synthesis.codec import MASK_CODECS  # noqa: E402
 from rhuh_synthesis.manifest import write_once_json  # noqa: E402
 from rhuh_synthesis.provenance import code_version, config_sha256, snapshot_tests  # noqa: E402
 from rhuh_synthesis.representation import run_gate, vae_codec  # noqa: E402
+
+CODEC_TAGS = {"scalar_id_over_max_rgb": "scalar", "class_separated_rgb": "class_rgb"}
 
 PRIVATE = REPO / "data" / "RHUH-GBM" / "synthesis" / "EXP-2026-001"
 
@@ -32,8 +35,16 @@ def main():
     parser.add_argument("--subfolder", default="vae")
     parser.add_argument("--allow-download", action="store_true")
     parser.add_argument("--device", default="cpu")
-    parser.add_argument("--out", type=Path, default=PRIVATE / "representation_gate_v1/report.json")
+    parser.add_argument("--codec", choices=sorted(MASK_CODECS), default="scalar_id_over_max_rgb")
+    parser.add_argument("--upsample", type=int, choices=(1, 2), default=1, help="2 = 512 px, same field of view")
+    parser.add_argument("--batch", type=int, default=16)
+    parser.add_argument("--out", type=Path, help="Default: representation_gate_<size>_<codec>/report.json")
     args = parser.parse_args()
+    variant = f"{256 * args.upsample}_{CODEC_TAGS[args.codec]}"
+    if args.out is None:
+        args.out = PRIVATE / f"representation_gate_{variant}" / "report.json"
+    if args.out.exists():
+        sys.exit(f"{args.out} already exists (write-once); choose a new --out to rerun")
     import torch
     from diffusers import AutoencoderKL
 
@@ -60,7 +71,9 @@ def main():
     report = run_gate(
         references, spacing, lambda path: vae_codec(vae, path, device=args.device), gate,
         min_iou=config["evaluation"]["lesions"]["min_iou"], tiny_ml=config["evaluation"]["lesions"]["tiny_ml"],
+        mask_codec=args.codec, upsample=args.upsample, batch=args.batch,
     )
+    report["variant"]["name"] = variant
     snapshot, snapshot_sha = snapshot_tests(REPO / "tests", args.out.parent / "test_snapshots")
     report.update(
         role="train",
@@ -85,7 +98,7 @@ def main():
         print(f"{name}: pass={summary['pass']} dice={summary['macro_id3_dice']:.3f} "
               f"recall={summary['macro_id3_recall']:.3f} spurious3={summary['mean_spurious_id3_ml_negative']:.4f} "
               f"id1={summary['mean_unsupported_id1_ml']:.4f}")
-    print(f"GATE {'PASS' if report['pass'] else 'FAIL'}; report {path.relative_to(REPO)} sha256={digest}")
+    print(f"GATE[{variant}] {'PASS' if report['pass'] else 'FAIL'}; report {path.relative_to(REPO)} sha256={digest}")
 
 
 if __name__ == "__main__":

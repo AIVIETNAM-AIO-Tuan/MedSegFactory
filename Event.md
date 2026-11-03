@@ -110,6 +110,42 @@ gates; no diffusion training, generation, validation or test scoring.
   nothing was pushed to the original repository. README.md and the QC notebook
   (which has saved outputs listing patient IDs) were left uncommitted.
 
+## 2026-11-03 — First Colab run (user-run, results in the Colab notebook)
+
+- Host: NVIDIA RTX PRO 6000 Blackwell Server Edition, 97,887 MiB, driver 580.82.07.
+  Colab's torch 2.11.0+cu130 includes sm_120, so no reinstall was needed (Python 3.13).
+- Drive sources verified: 160/160 files match the manifest SHA256, so the laptop
+  exports and decisions are valid on Colab.
+- Local tests on Colab: 177/178 passed. The failure was a test artifact: root may
+  write read-only files, so the snapshot read-only check now tests permission bits.
+- Representation gate (scalar codec, 256 px, 24 accepted training patients): FAIL on
+  every path (posterior mean and seeds 11/22/33 gave nearly identical results):
+  macro ID-3 Dice 0.243 (needs >=0.90); macro lesion recall 0.343, pooled 6/14 lesions
+  (needs >=0.95); spurious ID-3 0.105 mL per negative patient (needs <=0.01);
+  unsupported ID-1 3.91 mL per patient (needs <=0.01).
+- Local check on one slice: the small ID-3 lesion decoded mostly as ID 2, and 81% of
+  the invented ID 1 lay on ID-2 borders. This is consistent with VAE smoothing of the
+  ordinal gray codec plus lesions near the 8 mm latent stride; it is not a geometry
+  bug (ID 2 largely preserved). Representation decision: fallback required (plan section 8).
+
+## 2026-11-03 — Representation fallbacks preregistered (user-approved)
+
+- Before any fallback was run, the config fixed three named variants and their
+  order: 512_scalar (512 px, same field of view, gray-level codec), then
+  256_class_rgb (one class per RGB channel), then 512_class_rgb (both). The
+  first variant passing on every path is selected; if none passes, it is a
+  representation failure. Crop + 512 px (plan fallback 3) is not yet gated.
+- Fixed rules: in-plane 2x nearest-neighbour upsampling. Mapping back to the 1 mm
+  grid uses the 2x2-block mode, with ties going to the top-left pixel. Class-RGB
+  decoding takes the strongest channel above 0.5, else background; exact ties go
+  to the higher ID.
+- Local smoke test after preregistration (one training slice, posterior mean
+  only, not the gate): residual-tumor voxels kept 0/29, 1/29, 11/29 and 24/29;
+  fake ID 1: 78, 51, 0 and 0 voxels, for 256 scalar, 512 scalar, 256 class-RGB
+  and 512 class-RGB respectively. The gate on 24 patients decides.
+- New Colab runner `notebooks/RHUH_GBM_Colab_fallback_gates.ipynb`. Each variant
+  writes its own write-once report; the v1 report is untouched.
+
 ## 2026-11-03 — Ignore graphify output
 
 User requested exclusion of the graphify folder from Git. Added the existing

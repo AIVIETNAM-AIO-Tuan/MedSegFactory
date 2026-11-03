@@ -68,7 +68,21 @@
     "id3_macro_lesion_recall_min": 0.95,
     "spurious_id3_ml_per_negative_patient_max": 0.01,
     "unsupported_id1_ml_per_patient_max": 0.01,
-    "sample_seeds": [11, 22, 33]
+    "sample_seeds": [11, 22, 33],
+    "fallbacks": {
+      "preregistered": "2026-11-03, after the reference 256_scalar gate failed and before any fallback was run",
+      "order": ["512_scalar", "256_class_rgb", "512_class_rgb"],
+      "variants": {
+        "512_scalar": {"upsample": 2, "mask_codec": "scalar_id_over_max_rgb"},
+        "256_class_rgb": {"upsample": 1, "mask_codec": "class_separated_rgb"},
+        "512_class_rgb": {"upsample": 2, "mask_codec": "class_separated_rgb"}
+      },
+      "upsampling": "in-plane nearest neighbour x2: 512 px over the same field of view, 0.5 mm/px, 4 mm VAE stride",
+      "back_to_1mm": "each 2x2 block takes its most frequent ID; ties go to the top-left pixel",
+      "class_rgb_decoding": "strongest channel above 0.5 after denormalization; otherwise background; exact ties go to the higher ID",
+      "selection_rule": "select the first variant in order that passes on every path; if none passes, report a representation failure",
+      "not_yet_gated": "fixed pre-op crop + 512 px (plan section 8 fallback 3)"
+    }
   },
   "evaluation": {
     "primary_roi_dilation_mm": 10.0,

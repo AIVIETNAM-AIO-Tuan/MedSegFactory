@@ -60,8 +60,17 @@ Validation export under the frozen policy: 3/6 accepted, 3/6 quarantined
 automatically (1 accepted patient has residual tumor). Code is on the fork's
 branch `exp-2026-001-implementation`; Colab runner `notebooks/RHUH_GBM_Colab.ipynb`.
 
+First Colab run (2026-11-03): GPU confirmed (RTX PRO 6000 Blackwell, 96 GB;
+torch 2.11 cu130 supports it); Drive sources match the manifest (160/160);
+local tests 177/178 on Colab (one root-permission test artifact, fixed).
+Representation gate v1 (256 px, scalar codec): FAIL on every path. ID-3 Dice
+0.24, lesion recall 0.34, spurious ID 3 0.105 mL, invented ID 1 3.9 mL per patient.
+
+Representation fallbacks implemented and preregistered (512_scalar, 256_class_rgb,
+512_class_rgb; first passing variant selected). Local suite: 187 passed, 5 subtests.
+
 Next smallest steps:
-1. Copy the private `data/RHUH-GBM/synthesis/` folder to Drive `MyDrive/RHUH-GBM/synthesis/` and run the Colab runner.
+1. Run `notebooks/RHUH_GBM_Colab_fallback_gates.ipynb` on Colab (copy the updated `test_snapshots` folder to Drive first) and apply the selection rule.
 2. On the Colab RTX 6000: confirm the GPU, install a matching torch build, run the model tests once, then run the representation gate (~minutes on GPU vs ~12 h on this CPU).
 3. Register/export the validation patients under the frozen policy; keep test sealed.
 4. Load the MedSegFactory checkpoint strictly and check adapter equivalence on the real model.

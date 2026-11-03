@@ -19,24 +19,58 @@ clinical margins.
 
 import numpy as np
 
-from .codec import decode_mask, encode_mask
+from .codec import MASK_CODECS
 from .evaluation import dice, match_lesions, volume_ml
 
+REFERENCE_CODEC = "scalar_id_over_max_rgb"
 
-def roundtrip_volume(labels_zyx, codec_fn, *, max_id=3, batch=16):
+
+def upsample_labels(slices, factor):
+    """Nearest-neighbour in-plane upsampling of ``[N, H, W]`` labels by ``factor``."""
+    slices = np.asarray(slices)
+    return np.repeat(np.repeat(slices, factor, axis=1), factor, axis=2)
+
+
+def downsample_labels(slices, factor, max_id=3):
+    """Map ``[N, H*f, W*f]`` labels back to ``[N, H, W]`` (preregistered rule).
+
+    Each ``factor x factor`` block takes its most frequent ID; a tie goes to the
+    block's top-left pixel (the nearest-neighbour sample), or to the lowest tied
+    ID if the top-left pixel is not among the tied IDs.
+    """
+    slices = np.asarray(slices)
+    n, height, width = slices.shape
+    if height % factor or width % factor:
+        raise ValueError("Slice size is not divisible by the factor")
+    h, w = height // factor, width // factor
+    blocks = slices.reshape(n, h, factor, w, factor).transpose(0, 1, 3, 2, 4).reshape(n, h, w, factor * factor)
+    counts = np.stack([(blocks == label_id).sum(axis=-1) for label_id in range(max_id + 1)], axis=-1)
+    tied = counts == counts.max(axis=-1, keepdims=True)
+    top_left = blocks[..., 0].astype(np.int64)
+    top_left_tied = np.take_along_axis(tied, top_left[..., None], axis=-1)[..., 0]
+    mode = np.argmax(counts, axis=-1)
+    return np.where((tied.sum(axis=-1) > 1) & top_left_tied, top_left, mode).astype(np.uint8)
+
+
+def roundtrip_volume(labels_zyx, codec_fn, *, mask_codec=REFERENCE_CODEC, upsample=1, batch=16):
     """Round-trip a ``[Z, Y, X]`` label volume slice by slice; returns uint8 IDs.
 
     ``codec_fn`` maps a float32 batch ``[N, 3, H, W]`` in [-1, 1] to decoder
-    output of the same shape (nominally in [-1, 1]).
+    output of the same shape. With ``upsample`` > 1 the slices are upsampled by
+    nearest neighbour before encoding and mapped back with ``downsample_labels``,
+    so scoring stays in the 1 mm patient grid.
     """
+    encode, decode = MASK_CODECS[mask_codec]
     labels_zyx = np.asarray(labels_zyx)
     out = np.empty(labels_zyx.shape, dtype=np.uint8)
     for start in range(0, labels_zyx.shape[0], batch):
         chunk = labels_zyx[start : start + batch]
-        decoded = np.asarray(codec_fn(encode_mask(chunk, max_id=max_id)))
-        if decoded.shape != (len(chunk), 3) + chunk.shape[1:]:
-            raise ValueError(f"Codec returned {decoded.shape} for {chunk.shape}")
-        out[start : start + batch] = decode_mask(decoded, max_id=max_id)
+        work = upsample_labels(chunk, upsample) if upsample > 1 else chunk
+        decoded = np.asarray(codec_fn(encode(work)))
+        if decoded.shape != (len(work), 3) + work.shape[1:]:
+            raise ValueError(f"Codec returned {decoded.shape} for {work.shape}")
+        restored = decode(decoded)
+        out[start : start + batch] = downsample_labels(restored, upsample) if upsample > 1 else restored
     return out
 
 
@@ -100,7 +134,10 @@ def summarize_path(patients, thresholds):
     return summary
 
 
-def run_gate(references, spacing, codec_factory, thresholds, *, min_iou=0.10, tiny_ml=0.1):
+def run_gate(
+    references, spacing, codec_factory, thresholds, *, min_iou=0.10, tiny_ml=0.1,
+    mask_codec=REFERENCE_CODEC, upsample=1, batch=16,
+):
     """Run every path for every training reference.
 
     ``references`` maps patient -> ``[Z, Y, X]`` labels. ``codec_factory(path)``
@@ -108,11 +145,17 @@ def run_gate(references, spacing, codec_factory, thresholds, *, min_iou=0.10, ti
     ``"mean"`` or ``"sample_<seed>"`` for each configured seed.
     """
     paths = ["mean"] + [f"sample_{seed}" for seed in thresholds["sample_seeds"]]
-    report = {"paths": {}, "per_patient": {}}
+    report = {
+        "variant": {"mask_codec": mask_codec, "upsample": int(upsample)},
+        "paths": {},
+        "per_patient": {},
+    }
     for path in paths:
         per_patient = {}
         for patient, labels in sorted(references.items()):
-            predicted = roundtrip_volume(labels, codec_factory(path))
+            predicted = roundtrip_volume(
+                labels, codec_factory(path), mask_codec=mask_codec, upsample=upsample, batch=batch
+            )
             per_patient[patient] = patient_metrics(labels, predicted, spacing, min_iou=min_iou, tiny_ml=tiny_ml)
         report["per_patient"][path] = per_patient
         report["paths"][path] = summarize_path(per_patient, thresholds)
