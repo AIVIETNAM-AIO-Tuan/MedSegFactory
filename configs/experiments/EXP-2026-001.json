@@ -211,5 +211,21 @@
       "guidance_slice_mae_ratio_max": 0.8
     },
     "decision": "diagnostic only, no PASS; the readings pick the one training change for r3, declared before r3"
+  },
+  "stage4_r3_init_sources": {
+    "purpose": "separate the image-stream initialization sources before changing training: can available pre-op anatomy provide the spatial anchor that the oracle start provided in r2?",
+    "fixed": "2026-11-04, after r2 and before r3",
+    "training_and_standard_evaluation": "identical to stage4_overfit (third repeat); its checks are scored again",
+    "evaluated_model": "the step-500 model, in the same session",
+    "start_timestep": "first DDIM timestep (981)",
+    "image_stream_starts": {
+      "own_postop": "own post-op target latent; oracle diagnostic, never a result",
+      "own_preop": "own pre-op latent (cached z_pre); available at inference",
+      "wrong_patient_preop": "pre-op latent of the shifted-condition slice (another patient); negative control"
+    },
+    "kept_fixed": "mask stream from pure noise; the same seeded noise, start timestep, own text and own concatenated pre-op conditions in every arm",
+    "reading": {"retrieval_min": 12, "gap_closed_min": 0.5, "specificity_margin": 8},
+    "reading_rules": "preop anchor works: own-pre-op retrieval >= 12/16 and it closes >= half the whole-slice MAE gap between pure noise and the oracle start; patient-specific: its retrieval exceeds the wrong-patient arm's by >= 8",
+    "decision": "diagnostic only, no PASS. preop_anchor_justified: a pre-op-initialized editing baseline becomes justified (declared as a new arm before use); only_future_target_rescues: stronger evidence that training must change; image_anchor_insufficient: the image start alone does not rescue generation"
   }
 }

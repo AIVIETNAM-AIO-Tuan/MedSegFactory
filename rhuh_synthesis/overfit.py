@@ -223,9 +223,37 @@ def start_latents(cache, items, noise, scheduler, timestep):
     return scheduler.add_noise(clean.to(device=noise.device, dtype=noise.dtype), noise, steps)
 
 
+def image_start_latents(cache, items, source):
+    """Clean image latents [N, 4, h, w] for an image-stream start: ``"post"`` or ``"pre"``.
+
+    ``"post"`` is each item's cached post-op target (posterior mean x scaling
+    factor; an oracle diagnostic). ``"pre"`` is its cached pre-op latent
+    ``z_pre`` (the same encoding, available at inference).
+    """
+    if source not in ("post", "pre"):
+        raise ValueError(f"source must be 'post' or 'pre', got {source!r}")
+    records = cache["patients"]
+    if source == "pre":
+        return torch.stack([records[p]["z_pre"][z] for p, z in items])
+    return torch.stack([records[p]["image_mean"][z] for p, z in items]) * cache["scaling_factor"]
+
+
+def mix_image_start(noise, scheduler, timestep, image_clean):
+    """Replace the image rows of ``noise`` [2n, ...] by ``add_noise(image_clean, those rows, timestep)``.
+
+    The mask rows stay pure noise.
+    """
+    n = noise.shape[0] // 2
+    if noise.shape[0] != 2 * n or tuple(image_clean.shape) != tuple(noise[:n].shape):
+        raise ValueError(f"image_clean {tuple(image_clean.shape)} must match the image rows of {tuple(noise.shape)}")
+    steps = torch.full((n,), int(timestep), dtype=torch.long, device=noise.device)
+    image = scheduler.add_noise(image_clean.to(device=noise.device, dtype=noise.dtype), noise[:n], steps)
+    return torch.cat([image, noise[n:]])
+
+
 @torch.no_grad()
 def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidance_scale, seed, batch,
-             mask_codec, condition_items=None, start_from=None):
+             mask_codec, condition_items=None, start_from=None, start_image=None):
     """Sample one pair per item; returns ``(images [N, H, W] in [0, 1], masks [N, H, W] uint8)``.
 
     Each item uses its own first prompt pair (empty-prompt guidance) and the
@@ -234,8 +262,10 @@ def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidanc
     so the same items and batch give the same noise at every checkpoint. With
     ``start_from`` (oracle diagnostic, never a result), sampling instead starts
     from ``start_latents`` of those items at the first sampling timestep, with
-    the same noise draws. Sets ``unet`` to eval mode and releases the JCA
-    attention maps afterwards.
+    the same noise draws. ``start_image`` [N, 4, h, w] (clean image latents,
+    e.g. ``image_start_latents``) starts only the image stream that way; the
+    mask stream stays pure noise. Sets ``unet`` to eval mode and releases the
+    JCA attention maps afterwards.
     """
     items = list(items)
     condition_items = items if condition_items is None else list(condition_items)
@@ -243,6 +273,8 @@ def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidanc
         raise ValueError("condition_items must match items")
     if start_from is not None and len(start_from) != len(items):
         raise ValueError("start_from must match items")
+    if start_image is not None and (start_from is not None or len(start_image) != len(items)):
+        raise ValueError("start_image must match items and cannot be combined with start_from")
     reference = next(unet.parameters())
     device, dtype = reference.device, reference.dtype
     generator = torch.Generator().manual_seed(seed)
@@ -260,6 +292,8 @@ def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidanc
         if start_from is not None:
             initial = start_latents(cache, start_from[start : start + batch], initial, scheduler,
                                     scheduler.timesteps[0])
+        if start_image is not None:
+            initial = mix_image_start(initial, scheduler, scheduler.timesteps[0], start_image[start : start + batch])
         image_latents, mask_latents = sample_pairs(
             unet, scheduler, z_pre, m_pre, image_text, empty, mask_text, empty,
             num_inference_steps=num_inference_steps, guidance_scale=guidance_scale, generator=generator,
@@ -420,6 +454,41 @@ def diagnostic_readings(final, diagnostics, reading):
             and guidance_ratio <= reading["guidance_slice_mae_ratio_max"]
             and guidance[best]["foreground_dice_mean"] > pure["foreground_dice_mean"],
         },
+    }
+
+
+def init_source_readings(final, arms, reading):
+    """Preregistered r3 readings: can the available pre-op image anchor the image stream?
+
+    ``final`` is the standard pure-noise evaluation; ``arms`` holds the
+    ``image_start_own_postop`` (oracle), ``image_start_own_preop`` and
+    ``image_start_wrong_patient_preop`` evaluations. Diagnostic only.
+    """
+    pure, oracle = final["summary"], arms["image_start_own_postop"]["summary"]
+    pre, wrong = arms["image_start_own_preop"]["summary"], arms["image_start_wrong_patient_preop"]["summary"]
+    gap = pure["slice_mae_mean"] - oracle["slice_mae_mean"]
+    closed = (pure["slice_mae_mean"] - pre["slice_mae_mean"]) / gap if gap > 0 else None
+    oracle_rescues = oracle["retrieval_top1"] >= reading["retrieval_min"]
+    pre_works = (pre["retrieval_top1"] >= reading["retrieval_min"] and closed is not None
+                 and closed >= reading["gap_closed_min"])
+    specific = pre["retrieval_top1"] - wrong["retrieval_top1"] >= reading["specificity_margin"]
+    if pre_works and specific:
+        verdict = "preop_anchor_justified"
+    elif oracle_rescues:
+        verdict = "only_future_target_rescues"
+    else:
+        verdict = "image_anchor_insufficient"
+    return {
+        "oracle_retrieval_top1": oracle["retrieval_top1"],
+        "oracle_mask_retrieval_top1": oracle["mask_retrieval_top1"],
+        "preop_retrieval_top1": pre["retrieval_top1"],
+        "wrong_patient_retrieval_top1": wrong["retrieval_top1"],
+        "wrong_patient_follows_source": arms["image_start_wrong_patient_preop"].get("follows_source"),
+        "preop_gap_closed": closed,
+        "oracle_image_anchor_rescues": oracle_rescues,
+        "preop_anchor_works": pre_works,
+        "preop_anchor_is_patient_specific": specific,
+        "verdict": verdict,
     }
 
 

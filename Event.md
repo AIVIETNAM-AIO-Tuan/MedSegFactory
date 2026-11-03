@@ -441,3 +441,33 @@ git ls-files found no tracked files under that directory. No files were deleted.
     background.
   - The separate-timestep and guidance explanations are not supported.
 - Cost: training 1,105 s, peak 70.2 GiB, whole run 31 min.
+
+## 2026-11-04 — Stage 4 r3 preregistered (image-stream start sources; not run)
+
+- Design proposed by the user: separate the initialization sources before
+  changing training. Config block `stage4_r3_init_sources`, fixed before r3.
+- Training, standard evaluations and checks: identical to r1/r2 (third repeat).
+- On the step-500 model, the image stream starts at t = 981 from one of:
+  - own post-op target latent (oracle diagnostic, never a result);
+  - own pre-op latent (cached `z_pre`, available at inference);
+  - pre-op latent of the shifted-condition slice of another patient (negative
+    control).
+- Kept fixed in every arm: mask stream from pure noise, the same seeded noise,
+  the start timestep, own text and own concatenated pre-op conditions.
+- Readings (engineering thresholds, fixed now):
+  - the pre-op anchor works if own-pre-op retrieval >= 12/16 and it closes at
+    least half of the whole-slice MAE gap between pure noise and the oracle
+    start;
+  - it is patient-specific if its retrieval exceeds the wrong-patient arm's by
+    >= 8.
+- Verdicts:
+  - `preop_anchor_justified`: a pre-op-initialized editing baseline becomes
+    justified, declared as a new arm before use;
+  - `only_future_target_rescues`: stronger evidence that training must change;
+  - `image_anchor_insufficient`: the image start alone does not rescue
+    generation.
+- Code: `overfit.image_start_latents`, `mix_image_start`,
+  `generate(start_image=...)`, `init_source_readings`. Runner:
+  `notebooks/RHUH_GBM_Colab_stage4_r3.ipynb`. Optional `SAVE_UNET_TO_DRIVE`
+  (about 3.8 GB) is off by default.
+- Tests: 23 overfit tests; 5/5 planted mutations caught.

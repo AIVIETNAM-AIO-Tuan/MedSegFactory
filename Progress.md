@@ -127,9 +127,16 @@ Stage 4 r2 on Colab (commit de6b0d4, 2026-11-04): r1 reproduced; ITERATE.
 - Neither separate per-stream timesteps nor guidance explains the failure.
 - The failure is at the start of sampling: nothing slice-specific steers it.
 
+Stage 4 r3 prepared (user-designed), NOT RUN.
+- It repeats the training, then starts the image stream from the own post-op
+  target (oracle), the own pre-op image, or a wrong patient's pre-op image.
+- The mask stream starts from pure noise in every arm. Config block
+  `stage4_r3_init_sources`.
+- Runner: `notebooks/RHUH_GBM_Colab_stage4_r3.ipynb`.
+
 Next smallest steps:
-1. Choose the r3 change (user decision): an inference-safe start from the
-   noised pre-op pair, or a training-side schedule fix (zero terminal SNR).
+1. Run Stage 4 r3 on Colab (about 33 minutes). Its verdict decides between a
+   pre-op-initialized editing arm and a training change.
 2. Stage 5 (1,000-step pilot) needs a Stage 4 PASS, or an approved deviation.
 3. Optional: an affine registration variant (policy v2) to recover quarantined pairs.
 
