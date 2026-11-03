@@ -182,5 +182,34 @@
       "invented_id1_mm2_max": 10.0
     },
     "decision": "PASS if every check holds; otherwise ITERATE: record the failed checks, keep the slice set, rerun under a new run tag with one change declared before the rerun"
+  },
+  "stage4_r2_diagnostics": {
+    "purpose": "r2 repeats the r1 training unchanged (the one change: diagnostics on the trained model) to locate why generations ignore the pre-op inputs; oracle diagnostics use training targets and are never results",
+    "fixed": "2026-11-03, after r1 and before r2",
+    "training_and_standard_evaluation": "identical to stage4_overfit; its checks are scored again to test reproducibility",
+    "evaluated_model": "the step-500 model, in the same session",
+    "leftover_signal": {
+      "start": "first DDIM timestep (981): add_noise(target latents, the same seeded noise as the pure-noise run)",
+      "sources": ["own target", "target of the shifted-condition slice"],
+      "kept": "own text and own pre-op inputs"
+    },
+    "partner_reliance": {
+      "timesteps": [900, 961, 981, 999],
+      "modes": {"equal": "both streams at t", "mask_clean": "mask stream at t = 0", "image_clean": "image stream at t = 0"}
+    },
+    "guidance_scales": [1.0, 3.0],
+    "metrics": {
+      "foreground_threshold": 0.05,
+      "added": "whole-slice MAE; background MAE outside the pre-op brain; foreground Dice (intensity > threshold); own-target rank among the 16 by whole-slice MAE; nearest training mask by Dice of label > 0; share of generated labels inside the generated foreground"
+    },
+    "reading": {
+      "leftover_own_slice_mae_ratio_max": 0.75,
+      "leftover_own_retrieval_top1_min": 12,
+      "leftover_other_follows_min": 12,
+      "partner_high_timesteps": [961, 981, 999],
+      "partner_loss_ratio_max": 0.5,
+      "guidance_slice_mae_ratio_max": 0.8
+    },
+    "decision": "diagnostic only, no PASS; the readings pick the one training change for r3, declared before r3"
   }
 }

@@ -24,6 +24,7 @@ fixed seed for DDIM sampling, so every checkpoint sees identical inputs.
 
 import numpy as np
 import torch
+from diffusers.utils.torch_utils import randn_tensor
 
 from .model import stack_unet_input
 from .sampling import decode_pair, sample_pairs
@@ -150,7 +151,8 @@ def _first_prompts(cache, items, device, dtype):
 
 
 @torch.no_grad()
-def fixed_eval_loss(unet, cache, items, noise_scheduler, *, timesteps, seed, batch=4):
+def fixed_eval_loss(unet, cache, items, noise_scheduler, *, timesteps, seed, batch=4,
+                    image_timestep=None, mask_timestep=None):
     """Per-stream noise MSE at fixed timesteps and noise.
 
     Returns ``{"image": {"mean", "by_timestep": {"<t>": mse}}, "mask": ...}``
@@ -160,6 +162,9 @@ def fixed_eval_loss(unet, cache, items, noise_scheduler, *, timesteps, seed, bat
     means times the scaling factor; the noise comes from one CPU generator
     seeded with ``seed``, drawn per (timestep, chunk) in a fixed order. Sets
     ``unet`` to eval mode and releases the JCA attention maps afterwards.
+    ``image_timestep``/``mask_timestep`` hold that stream at one timestep (0:
+    a nearly clean partner) while the other follows ``timesteps``; results
+    stay keyed by ``timesteps`` and the noise draws are unchanged.
     """
     items = list(items)
     reference = next(unet.parameters())
@@ -179,7 +184,10 @@ def fixed_eval_loss(unet, cache, items, noise_scheduler, *, timesteps, seed, bat
                 torch.stack([records[p]["mask_mean"][z] for p, z in chunk]),
             ]) * scale
             noise = torch.randn(latents.shape, generator=generator)
-            steps = torch.full((2 * n,), int(t), dtype=torch.long)
+            steps = torch.cat([
+                torch.full((n,), int(t if image_timestep is None else image_timestep)),
+                torch.full((n,), int(t if mask_timestep is None else mask_timestep)),
+            ]).long()
             noisy = noise_scheduler.add_noise(latents, noise, steps).to(device=device, dtype=dtype)
             z_pre, m_pre = _conditions(cache, chunk, device, dtype)
             image_text, mask_text = _first_prompts(cache, chunk, device, dtype)
@@ -197,21 +205,44 @@ def fixed_eval_loss(unet, cache, items, noise_scheduler, *, timesteps, seed, bat
             for stream, values in by_timestep.items()}
 
 
+def start_latents(cache, items, noise, scheduler, timestep):
+    """Oracle start: the items' cached target latents noised to ``timestep`` with ``noise``.
+
+    Target latents are posterior means times the scaling factor, stacked as
+    ``[images; masks]`` like ``noise``; the result is ``add_noise`` at one
+    timestep. Diagnostic only: it uses the training targets.
+    """
+    records = cache["patients"]
+    if noise.shape[0] != 2 * len(items):
+        raise ValueError(f"noise has {noise.shape[0]} rows for {len(items)} items")
+    clean = torch.cat([
+        torch.stack([records[p]["image_mean"][z] for p, z in items]),
+        torch.stack([records[p]["mask_mean"][z] for p, z in items]),
+    ]) * cache["scaling_factor"]
+    steps = torch.full((len(clean),), int(timestep), dtype=torch.long, device=noise.device)
+    return scheduler.add_noise(clean.to(device=noise.device, dtype=noise.dtype), noise, steps)
+
+
 @torch.no_grad()
 def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidance_scale, seed, batch,
-             mask_codec, condition_items=None):
+             mask_codec, condition_items=None, start_from=None):
     """Sample one pair per item; returns ``(images [N, H, W] in [0, 1], masks [N, H, W] uint8)``.
 
     Each item uses its own first prompt pair (empty-prompt guidance) and the
     pre-op conditions of ``condition_items`` (default: the item itself). One
     CPU generator seeded with ``seed`` draws every initial noise in item order,
-    so the same items and batch give the same noise at every checkpoint. Sets
-    ``unet`` to eval mode and releases the JCA attention maps afterwards.
+    so the same items and batch give the same noise at every checkpoint. With
+    ``start_from`` (oracle diagnostic, never a result), sampling instead starts
+    from ``start_latents`` of those items at the first sampling timestep, with
+    the same noise draws. Sets ``unet`` to eval mode and releases the JCA
+    attention maps afterwards.
     """
     items = list(items)
     condition_items = items if condition_items is None else list(condition_items)
     if len(condition_items) != len(items):
         raise ValueError("condition_items must match items")
+    if start_from is not None and len(start_from) != len(items):
+        raise ValueError("start_from must match items")
     reference = next(unet.parameters())
     device, dtype = reference.device, reference.dtype
     generator = torch.Generator().manual_seed(seed)
@@ -222,9 +253,17 @@ def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidanc
         z_pre, m_pre = _conditions(cache, condition_items[start : start + batch], device, dtype)
         image_text, mask_text = _first_prompts(cache, chunk, device, dtype)
         empty = cache["text"][""].to(device=device, dtype=dtype).expand(len(chunk), -1, -1)
+        # The same draw sample_pairs would make, so pure-noise runs are unchanged.
+        scheduler.set_timesteps(num_inference_steps, device=device)
+        initial = randn_tensor((2 * len(chunk), 4, *z_pre.shape[2:]), generator=generator, device=device,
+                               dtype=dtype) * scheduler.init_noise_sigma
+        if start_from is not None:
+            initial = start_latents(cache, start_from[start : start + batch], initial, scheduler,
+                                    scheduler.timesteps[0])
         image_latents, mask_latents = sample_pairs(
             unet, scheduler, z_pre, m_pre, image_text, empty, mask_text, empty,
             num_inference_steps=num_inference_steps, guidance_scale=guidance_scale, generator=generator,
+            initial_latents=initial,
         )
         decoded_images, decoded_masks = decode_pair(vae, image_latents, mask_latents, mask_codec=mask_codec)
         images.append(decoded_images)
@@ -233,17 +272,36 @@ def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidanc
     return np.concatenate(images), np.concatenate(masks)
 
 
-def score_slices(images, masks, targets, *, pixel_mm):
+def _dice(a, b):
+    """Dice of two boolean arrays; 1.0 when both are empty."""
+    total = int(a.sum()) + int(b.sum())
+    return 1.0 if total == 0 else float(2 * (a & b).sum() / total)
+
+
+def score_slices(images, masks, targets, *, pixel_mm, foreground_threshold=0.05):
     """Per-slice scores of generations against their own targets (working grid).
 
     ``targets`` are dicts with ``post_image``, ``pre_image``, ``label`` and
-    ``region`` (pre-op brain with target support). Image MAE and the copy
-    control (pre-op image as the prediction) use ``region``; mask scores use
-    the whole slice. Dice is None where the target lacks the class.
+    ``region`` (pre-op brain with target support), optionally ``brain`` (the
+    pre-op brain). Image MAE and the copy control (pre-op image as the
+    prediction) use ``region``; mask scores use the whole slice. Dice is None
+    where the target lacks the class. Whole-slice scores:
+
+    - ``slice_mae`` over every pixel; ``background_mae`` outside ``brain``;
+    - ``foreground_dice`` of intensity > ``foreground_threshold``, generated vs target;
+    - ``own_rank``: rank of the own target among all targets by whole-slice
+      MAE (1 = nearest), ``nearest_target`` its index;
+    - ``nearest_mask``/``nearest_mask_dice``: the target whose labelled area best
+      matches the generated one (Dice of label > 0; ties prefer the own
+      target), ``own_mask_dice`` the same against the own target;
+    - ``labels_inside_foreground``: share of generated labels inside the
+      generated foreground (None without labels).
     """
     area = float(pixel_mm) ** 2
+    target_images = np.stack([np.asarray(t["post_image"], np.float32) for t in targets])
+    target_labelled = [np.asarray(t["label"]) > 0 for t in targets]
     rows = []
-    for image, mask, target in zip(images, masks, targets, strict=True):
+    for i, (image, mask, target) in enumerate(zip(images, masks, targets, strict=True)):
         region = np.asarray(target["region"], bool)
         label = np.asarray(target["label"])
         row = {
@@ -259,6 +317,22 @@ def score_slices(images, masks, targets, *, pixel_mm):
             )
         row["id3_overlap"] = bool(((label == 3) & (mask == 3)).any()) if (label == 3).any() else None
         row["invented_id1_mm2"] = None if (label == 1).any() else float((mask == 1).sum() * area)
+        error = np.abs(image - target["post_image"])
+        row["slice_mae"] = float(error.mean())
+        outside = None if target.get("brain") is None else ~np.asarray(target["brain"], bool)
+        row["background_mae"] = float(error[outside].mean()) if outside is not None and outside.any() else None
+        generated_foreground = image > foreground_threshold
+        row["foreground_dice"] = _dice(generated_foreground, np.asarray(target["post_image"]) > foreground_threshold)
+        distances = np.abs(target_images - image[None]).mean(axis=(1, 2))
+        row["nearest_target"] = int(np.argmin(distances))
+        row["own_rank"] = int(1 + (distances < distances[i]).sum())
+        labelled = mask > 0
+        overlaps = [_dice(labelled, other) for other in target_labelled]
+        best = max(range(len(overlaps)), key=lambda j: (overlaps[j], j == i, -j))
+        row.update(nearest_mask=best, nearest_mask_dice=overlaps[best], own_mask_dice=overlaps[i])
+        row["labels_inside_foreground"] = (
+            float((labelled & generated_foreground).sum() / labelled.sum()) if labelled.any() else None
+        )
         rows.append(row)
     return rows
 
@@ -281,6 +355,71 @@ def summarize(rows, categories):
             r["labeled_mm2"] for r, c in zip(rows, categories, strict=True) if c == "label_free"
         ),
         "invented_id1_mm2_mean": _mean(r["invented_id1_mm2"] for r in rows),
+        "slice_mae_mean": _mean(r.get("slice_mae") for r in rows),
+        "background_mae_mean": _mean(r.get("background_mae") for r in rows),
+        "foreground_dice_mean": _mean(r.get("foreground_dice") for r in rows),
+        "retrieval_top1": sum(r.get("own_rank") == 1 for r in rows),
+        "mask_retrieval_top1": sum(r.get("nearest_mask") == k for k, r in enumerate(rows)),
+        "labels_inside_foreground_mean": _mean(r.get("labels_inside_foreground") for r in rows),
+    }
+
+
+def follows_source(rows, sources, items):
+    """How many generations are nearest (whole-slice MAE) to the target of their ``sources`` item."""
+    index = {item: k for k, item in enumerate(items)}
+    return sum(row["nearest_target"] == index[source] for row, source in zip(rows, sources, strict=True))
+
+
+def diagnostic_readings(final, diagnostics, reading):
+    """Preregistered readings of the r2 diagnostics (engineering thresholds; no PASS/FAIL).
+
+    ``final`` is the standard step-500 evaluation (pure noise, standard
+    guidance). ``diagnostics`` holds ``start_own_target``/``start_other_target``
+    (with ``follows_source``), ``guidance_<scale>`` evaluations and
+    ``partner_reliance`` (``fixed_eval_loss`` results for ``equal``,
+    ``mask_clean`` and ``image_clean``). A value that cannot be evaluated
+    gives False.
+    """
+    def ratio(a, b):
+        return None if a is None or not b else a / b
+
+    pure = final["summary"]
+    own, other = diagnostics["start_own_target"], diagnostics["start_other_target"]
+    own_ratio = ratio(own["summary"]["slice_mae_mean"], pure["slice_mae_mean"])
+    partner, high = diagnostics["partner_reliance"], [str(t) for t in reading["partner_high_timesteps"]]
+
+    def partner_ratio(mode, stream):
+        values = [ratio(partner[mode][stream]["by_timestep"][t], partner["equal"][stream]["by_timestep"][t])
+                  for t in high]
+        return None if None in values else float(np.mean(values))
+
+    image_ratio, mask_ratio = partner_ratio("mask_clean", "image"), partner_ratio("image_clean", "mask")
+    guidance = {name: d["summary"] for name, d in diagnostics.items() if name.startswith("guidance_")}
+    best = min(guidance, key=lambda name: guidance[name]["slice_mae_mean"])
+    guidance_ratio = ratio(guidance[best]["slice_mae_mean"], pure["slice_mae_mean"])
+    return {
+        "leftover_signal": {
+            "own_start_slice_mae_ratio": own_ratio,
+            "own_start_retrieval_top1": own["summary"]["retrieval_top1"],
+            "other_start_follows_source": other["follows_source"],
+            "generation_depends_on_leftover": own_ratio is not None
+            and own_ratio <= reading["leftover_own_slice_mae_ratio_max"]
+            and own["summary"]["retrieval_top1"] >= reading["leftover_own_retrieval_top1_min"],
+            "output_follows_leftover": other["follows_source"] >= reading["leftover_other_follows_min"],
+        },
+        "partner_reliance": {
+            "image_loss_ratio_with_clean_mask": image_ratio,
+            "mask_loss_ratio_with_clean_image": mask_ratio,
+            "image_leans_on_mask": image_ratio is not None and image_ratio <= reading["partner_loss_ratio_max"],
+            "mask_leans_on_image": mask_ratio is not None and mask_ratio <= reading["partner_loss_ratio_max"],
+        },
+        "guidance": {
+            "best_other_scale": best,
+            "slice_mae_ratio_vs_standard": guidance_ratio,
+            "over_guidance_contributes": guidance_ratio is not None
+            and guidance_ratio <= reading["guidance_slice_mae_ratio_max"]
+            and guidance[best]["foreground_dice_mean"] > pure["foreground_dice_mean"],
+        },
     }
 
 

@@ -53,6 +53,7 @@ def sample_pairs(
     guidance_scale=7.5,
     generator=None,
     latent_channels=4,
+    initial_latents=None,
 ):
     """Generate B paired (post-op image, mask) latents conditioned on pre-op inputs.
 
@@ -63,7 +64,10 @@ def sample_pairs(
     reference uses ``prompt_embeds.dtype``). ``generator`` (optional
     ``torch.Generator``) draws the initial noise and is forwarded, with
     ``eta=0.0``, to ``scheduler.step`` when its signature accepts them, as the
-    reference ``prepare_extra_step_kwargs`` does.
+    reference ``prepare_extra_step_kwargs`` does. ``initial_latents``
+    [2B, latent_channels, h, w] (rows ``:B`` image, ``B:`` mask), if given,
+    replace ``noise * init_noise_sigma`` as the latents entering the first
+    timestep, and no initial noise is drawn.
 
     ``scheduler.set_timesteps`` resets and ``scheduler.step`` advances the
     passed scheduler, as in a diffusers pipeline; tensor inputs are never
@@ -107,10 +111,14 @@ def sample_pairs(
     m_rows = torch.cat([m_pre, m_pre], dim=0)
 
     scheduler.set_timesteps(num_inference_steps, device=device)
-    latents = randn_tensor(
-        (2 * batch, latent_channels, height, width), generator=generator, device=device, dtype=dtype
-    )
-    latents = latents * scheduler.init_noise_sigma
+    shape = (2 * batch, latent_channels, height, width)
+    if initial_latents is None:
+        latents = randn_tensor(shape, generator=generator, device=device, dtype=dtype)
+        latents = latents * scheduler.init_noise_sigma
+    elif not torch.is_tensor(initial_latents) or tuple(initial_latents.shape) != shape:
+        raise ValueError(f"initial_latents must be a tensor shaped {shape}")
+    else:
+        latents = initial_latents.to(device=device, dtype=dtype)
     image_latents, mask_latents = latents[:batch], latents[batch:]
     step_kwargs = _extra_step_kwargs(scheduler, generator)
 

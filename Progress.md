@@ -109,11 +109,20 @@ Stage 4 r1 on Colab (commit 6b0a271): ITERATE by the preregistered checks.
   the noisy input during training, so the conditioning was never needed; that
   information is absent when sampling from pure noise. Details in Event.md.
 
+Stage 4 r2 prepared (user-approved), NOT RUN.
+- It repeats the r1 training unchanged, then runs diagnostics on the step-500
+  model (config block `stage4_r2_diagnostics`):
+  - an oracle start from the leftover signal at t = 981;
+  - partner reliance (loss with the other stream clean);
+  - guidance 1 and 3;
+  - whole-slice, background, foreground, retrieval and image–mask metrics.
+- Runner: `notebooks/RHUH_GBM_Colab_stage4_r2.ipynb`.
+- The pure-noise generation path is bit-identical to r1's (CPU test).
+
 Next smallest steps:
-1. Review the r1 PNG grids.
-2. Choose the one change for the next run (user decision).
-3. Stage 5 (1,000-step pilot) needs a Stage 4 PASS, or an approved deviation.
-4. Optional: an affine registration variant (policy v2) to recover quarantined pairs.
+1. Run Stage 4 r2 on Colab (about 35 minutes). Its readings pick the one training change for r3, declared before r3.
+2. Stage 5 (1,000-step pilot) needs a Stage 4 PASS, or an approved deviation.
+3. Optional: an affine registration variant (policy v2) to recover quarantined pairs.
 
 ## 2026-11-03 — Git hygiene
 

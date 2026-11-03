@@ -355,3 +355,47 @@ git ls-files found no tracked files under that directory. No files were deleted.
     noise, which contains none.
   - The pre-op inputs would supply that information, but they are not used yet.
   - Untested.
+
+## 2026-11-03 — Stage 4 r2 preregistered (diagnostics; not run)
+
+- Approved by the user after an outside review of r1. Points accepted, each
+  checked against the code or schedule:
+  - Small adapter weights alone don't prove a shortcut. The behavioural
+    evidence is the shifted-input control.
+  - Low noise-prediction loss doesn't guarantee good generation. At t = 981 a
+    noise error becomes a 13x larger error in the predicted clean latent (8x at
+    t = 900, 0.3x at t = 100).
+  - Sampling starts at t = 981, where training inputs keep 7.6% of the target
+    (coefficient 0.0760), but from pure noise. The r1 loss check stopped at
+    t = 900.
+  - Training draws separate timesteps for the image and mask rows
+    (`tutorial_train.py:298`, copied at `rhuh_synthesis/model.py:288`), while
+    sampling uses one shared timestep.
+  - The r1 image MAE is computed only inside the pre-op brain, so a gray
+    background costs nothing.
+- Correction: the r1 loss fell at t <= 900. That drop says nothing about the
+  leftover-signal hypothesis, contrary to what was said earlier in this session.
+- r2 design (block `stage4_r2_diagnostics`). The r1 training, standard
+  evaluations and checks repeat unchanged, to test reproducibility. Then
+  diagnostics run on the step-500 model:
+  - oracle starts at t = 981 from the own target and from the shifted slice's
+    target;
+  - fixed-noise loss at t = 900/961/981/999 with both streams equal, mask clean,
+    or image clean;
+  - guidance 1 and 3;
+  - new metrics: whole-slice and background MAE, foreground Dice, own-target
+    retrieval among the 16, nearest training mask, labels inside the
+    generated foreground.
+- Reading thresholds (engineering choices, fixed now): own-start whole-slice
+  MAE <= 0.75 x pure noise with retrieval >= 12/16; other-start follows its
+  source >= 12/16; partner loss ratio <= 0.5 at t = 961/981/999; a lower
+  guidance with whole-slice MAE <= 0.8 x standard and better foreground Dice.
+  No PASS: the readings pick the one training change for r3.
+- Code changes:
+  - `sampling.sample_pairs(initial_latents=...)`;
+  - in `overfit`: `start_latents`, `generate(start_from=...)`,
+    `fixed_eval_loss(image_timestep/mask_timestep)`, the new metrics in
+    `score_slices`/`summarize`, `follows_source`, `diagnostic_readings`;
+  - runner `notebooks/RHUH_GBM_Colab_stage4_r2.ipynb`.
+- Tests: 20 overfit tests. The pure-noise path of `generate` is bit-identical
+  to the r1 code path, and 7/7 planted mutations were caught.
