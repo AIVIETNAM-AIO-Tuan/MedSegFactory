@@ -99,6 +99,20 @@
       }
     }
   },
+  "representation": {
+    "selected": "crop192_512_class_rgb",
+    "selected_on": "2026-11-03 by the preregistered fallback order (gate PASS on every path)",
+    "crop_mm": 192,
+    "out_px": 512,
+    "mask_codec": "class_separated_rgb",
+    "latent_grid": [64, 64],
+    "mask_fraction_cell": "8 crop pixels = 3 mm",
+    "image_forward": "bilinear at crop-pixel centres; 0 outside the frame",
+    "image_back_to_1mm": "box average of the crop pixels whose centres fall in each voxel; uncovered voxels are NaN (missing, never background)",
+    "image_rgb_to_gray": "mean of the three decoded channels after clamping to [0, 1]",
+    "labels_back_to_1mm": "most frequent ID per voxel; ties go to the nearest pixel",
+    "fixed": "2026-11-03, before any model output was scored"
+  },
   "evaluation": {
     "primary_roi_dilation_mm": 10.0,
     "stable_roi_dilation_mm": 30.0,

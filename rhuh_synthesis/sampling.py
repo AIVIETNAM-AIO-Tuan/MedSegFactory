@@ -144,3 +144,24 @@ def _extra_step_kwargs(scheduler, generator, eta=0.0):
     if "generator" in accepted:
         kwargs["generator"] = generator
     return kwargs
+
+
+@torch.no_grad()
+def decode_pair(vae, image_latents, mask_latents, *, mask_codec="scalar_id_over_max_rgb"):
+    """Decode sampled latents to ``(images [B, H, W] float32 in [0, 1], masks [B, H, W] uint8)``.
+
+    Latents are divided by the VAE scaling factor before decoding. MRI is the
+    mean of the three decoded channels after mapping to [0, 1] and clamping
+    (the image stream encodes grayscale repeated into RGB). Masks use the named
+    codec in ``codec.MASK_CODECS``; no class is remapped or deleted afterwards.
+    """
+    from .codec import MASK_CODECS
+
+    if mask_codec not in MASK_CODECS:
+        raise ValueError(f"Unknown mask codec {mask_codec!r}")
+    scale = float(vae.config.scaling_factor)
+    dtype = next(vae.parameters()).dtype
+    images = vae.decode(image_latents.to(dtype) / scale).sample.float()
+    images = ((images / 2.0 + 0.5).clamp(0.0, 1.0)).mean(dim=1).cpu().numpy()
+    masks = vae.decode(mask_latents.to(dtype) / scale).sample.float().cpu().numpy()
+    return images.astype("float32"), MASK_CODECS[mask_codec][1](masks)

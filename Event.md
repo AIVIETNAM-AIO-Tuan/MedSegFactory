@@ -188,6 +188,24 @@ gates; no diffusion training, generation, validation or test scoring.
 - Colab ran the older tests snapshot (187 tests); the laptop suite including
   the crop tests passed (191).
 
+## 2026-11-03 — Data path switched to the selected representation; Stage 3 prepared
+
+- MRI rules for the selected representation were fixed in the config before
+  any model output was scored. Forward: bilinear at crop-pixel centres. Back to
+  1 mm: box average per voxel, with uncovered voxels NaN (missing, not
+  background). Gray: mean of the three decoded channels.
+- Measured resampling-only floor (no VAE, no model) on the 24 accepted training
+  patients, post-op target taken crop -> 1 mm: MAE median 0.0087 (max 0.0126) in
+  R_p and 0.0098 (max 0.0120) in S_p; no uncovered ROI voxel. The copy baseline
+  is scored at 1 mm without this step, so the model comparison is conservative
+  by about this amount. Reported separately from VAE and generation losses.
+- Feature cache takes the target-mask codec as a parameter. Added
+  `working_grid.py` and `sampling.decode_pair`.
+- Added `stage3.py` (strict checkpoint load, adapter equivalence, memory/speed
+  profile, real-data step, checkpoint round trip, sampler check), CPU-tested.
+  Colab runner `notebooks/RHUH_GBM_Colab_stage3.ipynb`. Not training.
+  Local suite: 201 passed, 5 subtests.
+
 ## 2026-11-03 — Ignore graphify output
 
 User requested exclusion of the graphify folder from Git. Added the existing

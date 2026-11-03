@@ -29,7 +29,7 @@ import numpy as np
 import torch
 from diffusers.utils.torch_utils import randn_tensor
 
-from .codec import encode_image, encode_mask
+from .codec import MASK_CODECS, encode_image
 from .model import _check_generator, encode_pre_image, mask_fractions, training_loss
 from .text import TARGET_INFORMED, target_informed_prompts
 
@@ -117,8 +117,13 @@ def text_dropout(rng):
     return False, False
 
 
-def build_feature_cache(exports, vae, encode_text, text_config, *, batch=16, device="cpu"):
+def build_feature_cache(
+    exports, vae, encode_text, text_config, *, batch=16, device="cpu", mask_codec="scalar_id_over_max_rgb"
+):
     """Run the frozen encoders once over exported patients (target-informed arm).
+
+    ``mask_codec`` names the target-mask codec in ``codec.MASK_CODECS``; the
+    selected representation uses ``"class_separated_rgb"`` on the crop grid.
 
     ``exports`` maps patient -> exported ``[Z, Y, X]`` arrays (``pre_image`` and
     ``post_image`` float in [0, 1]; ``pre_label`` and ``label`` integer IDs 0..3);
@@ -131,7 +136,7 @@ def build_feature_cache(exports, vae, encode_text, text_config, *, batch=16, dev
              "z_pre": [Z, 4, h, w],   # encode_pre_image: posterior mean * scaling_factor
              "m_pre": [Z, 3, h, w],   # mask_fractions(pre_label)
              "image_mean", "image_logvar": [Z, 4, h, w],  # UNSCALED, encode_image(post_image)
-             "mask_mean", "mask_logvar": [Z, 4, h, w],    # UNSCALED, encode_mask(label)
+             "mask_mean", "mask_logvar": [Z, 4, h, w],    # UNSCALED, mask_codec(label)
              "prompts": [[(image_prompt, mask_prompt), ...] for each slice]}}}
 
     Tensors are float32 on the CPU without autograd history; slice ``z`` of a
@@ -150,6 +155,9 @@ def build_feature_cache(exports, vae, encode_text, text_config, *, batch=16, dev
         raise ValueError(f"batch must be >= 1, got {batch}")
     if not exports:
         raise ValueError("No exported patients")
+    if mask_codec not in MASK_CODECS:
+        raise ValueError(f"Unknown mask codec {mask_codec!r}")
+    encode_target_mask = MASK_CODECS[mask_codec][0]
     dtype = next(vae.parameters()).dtype
     patients = {}
     with torch.no_grad():
@@ -163,7 +171,7 @@ def build_feature_cache(exports, vae, encode_text, text_config, *, batch=16, dev
                 chunks["m_pre"].append(mask_fractions(part["pre_label"]))
                 for name, coded in (
                     ("image", encode_image(part["post_image"])),
-                    ("mask", encode_mask(part["label"], max_id=MASK_CODEC_MAX_ID)),
+                    ("mask", encode_target_mask(part["label"])),
                 ):
                     x = torch.from_numpy(np.ascontiguousarray(coded)).to(device=device, dtype=dtype)
                     posterior = vae.encode(x).latent_dist
@@ -196,6 +204,7 @@ def build_feature_cache(exports, vae, encode_text, text_config, *, batch=16, dev
         "format": CACHE_FORMAT,
         "arm": TARGET_INFORMED,
         "scaling_factor": float(vae.config.scaling_factor),
+        "mask_codec": mask_codec,
         "mask_codec_max_id": MASK_CODEC_MAX_ID,
         "text": text,
         "patients": patients,

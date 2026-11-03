@@ -76,9 +76,13 @@ implemented; local suite 191 passed, 5 subtests.
 Representation gate PASSED for crop192_512_class_rgb (Dice 0.943, lesion recall
 0.971, 13/14 lesions, no spurious ID 1/ID 3, 24/24 patients covered); selected.
 
+Data/cache/sampler path switched to the selected representation; MRI map-back
+rule fixed. Resampling-only floor: MAE ~0.009 in R_p and S_p. Stage 3 checks
+are implemented and CPU-tested.
+
 Next smallest steps:
-1. Switch the data/cache/sampler path to the selected representation (pre-op crop, 512 px, class-RGB targets) and fix the MRI map-back rule before scoring.
-2. Stage 3 on Colab: strict MedSegFactory checkpoint load, 4->11 equivalence on the real model, memory/throughput profile at 64x64 latents, one optimizer step.
+1. Run `notebooks/RHUH_GBM_Colab_stage3.ipynb` on Colab: strict checkpoint load, 4->11 equivalence, memory/speed profile at 64x64 latents, one real step, checkpoint round trip, sampler check.
+2. With those numbers, fix the microbatch/precision and request approval for Stage 4 (overfit ~16 training slices).
 3. Optional: affine registration variant (policy v2) to recover quarantined pairs.
 2. On the Colab RTX 6000: confirm the GPU, install a matching torch build, run the model tests once, then run the representation gate (~minutes on GPU vs ~12 h on this CPU).
 3. Register/export the validation patients under the frozen policy; keep test sealed.
