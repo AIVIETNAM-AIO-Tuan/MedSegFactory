@@ -577,3 +577,13 @@ git ls-files found no tracked files under that directory. No files were deleted.
   ID 1, brain MAE 0.045 below copy 0.096 and below the control 0.111. The
   step-0 comparison was not measured. Moving to Stage 5 needs the user's
   decision.
+
+## 2026-11-04 — Larger captioned grids; optional r4b presentation rerun
+
+- At the user's request, grid rows now show their image and mask prompts, and
+  each panel shows the 512 px slice at native size (4 in at 128 dpi).
+  `save_overfit_pages` writes one page per patient (4 rows).
+- `notebooks/RHUH_GBM_Colab_stage4_r4b.ipynb` repeats r4 exactly (same
+  weights, slices, seeds and arms) only to redraw it in this format. It also
+  saves the generated arrays, so later grids need no rerun, and it compares
+  its numbers with the r4 record. It is not a new experiment.
