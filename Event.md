@@ -587,3 +587,38 @@ git ls-files found no tracked files under that directory. No files were deleted.
   weights, slices, seeds and arms) only to redraw it in this format. It also
   saves the generated arrays, so later grids need no rerun, and it compares
   its numbers with the r4 record. It is not a new experiment.
+
+## 2026-11-04 — Text control (Test A) and VLM caption check (Test B) prepared (not run)
+
+- Requested by the user: both checks in one notebook, before Stage 5. Config
+  block `text_control_captions_v1` (EXP-2026-001), fixed before the run. No
+  training: the r3 step-500 weights and the 16 training slices.
+- Test A, text control, under the declared pre-op-pair start:
+  - each slice is generated with its own prompt, which must reproduce r4
+    (whole-slice MAE 0.0193 within 0.005);
+  - and with three scenario prompts: no annotated compartment, ID 2, and
+    ID 2 + ID 3.
+  - A generation adheres when its class set equals the request. Classes count
+    as present from 10 / 10 / 5 mm2 for IDs 1 / 2 / 3.
+  - 32 generations are counterfactual (request differs from the slice's own
+    classes). Reading: `text_controls_classes` when at least 24/32 adhere.
+- Test B, caption check: Qwen2.5-VL-7B-Instruct and MedGemma-4B caption the 16
+  pre-op slices as terms and as sentences (greedy decoding).
+  - MedGemma is gated and skipped without accepted terms and an HF token.
+  - Records CLIP token counts, alone and inside the image template (limit 77),
+    and a keyword flag against the pre-op labels.
+  - Descriptive only; local models only; no post-op slice is captioned.
+- Separate from EXP-2026-002 (supplied-scenario VLM prompting by another agent),
+  which ran in parallel in the same working tree. Its `text_probe.py` replaced
+  this effort's file of the same name, so this effort's code moved to
+  `rhuh_synthesis/caption_check.py` and
+  `notebooks/RHUH_GBM_Colab_text_control_captions.ipynb`. No EXP-2026-002 file
+  was changed.
+- Code:
+  - in `overfit`: `add_prompt_embeddings`, `generate(prompts=...)`,
+    `prompt_caption(pair=...)`, `class_set`, `text_control_readings`;
+  - `caption_check`: `slice_to_rgb`, `vlm_caption`, `caption_flags`,
+    `token_count`, `agreement`.
+- Tests: 8 new; 7/7 planted mutations caught. Full local suite: 282 passed,
+  including EXP-2026-002's tests. The CPU smoke run of the notebook passed end
+  to end with tiny models and stub VLMs.

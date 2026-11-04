@@ -145,10 +145,26 @@ def _conditions(cache, items, device, dtype):
     return z_pre, m_pre
 
 
-def _first_prompts(cache, items, device, dtype):
-    pairs = [cache["patients"][p]["prompts"][z][0] for p, z in items]
+def _embed_pairs(cache, pairs, device, dtype):
+    missing = sorted({prompt for pair in pairs for prompt in pair if prompt not in cache["text"]})
+    if missing:
+        raise ValueError(f"Prompts without cached embeddings (use add_prompt_embeddings): {missing}")
     embed = lambda prompts: torch.stack([cache["text"][prompt] for prompt in prompts]).to(device=device, dtype=dtype)
     return embed([a for a, _ in pairs]), embed([b for _, b in pairs])
+
+
+def _first_prompts(cache, items, device, dtype):
+    return _embed_pairs(cache, [cache["patients"][p]["prompts"][z][0] for p, z in items], device, dtype)
+
+
+def add_prompt_embeddings(cache, prompts, encode_text, *, batch=16):
+    """Encode prompts that ``cache["text"]`` lacks (float32, CPU); returns the added prompts in order."""
+    added = sorted({prompt for prompt in prompts if prompt not in cache["text"]})
+    for start in range(0, len(added), batch):
+        chunk = added[start : start + batch]
+        for prompt, embedding in zip(chunk, encode_text(chunk)):
+            cache["text"][prompt] = embedding.detach().to("cpu", torch.float32).clone()
+    return added
 
 
 @torch.no_grad()
@@ -301,7 +317,7 @@ def load_trained_unet(unet4, path, *, device="cpu"):
 
 @torch.no_grad()
 def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidance_scale, seed, batch,
-             mask_codec, condition_items=None, start_from=None, start_image=None, start_mask=None):
+             mask_codec, condition_items=None, start_from=None, start_image=None, start_mask=None, prompts=None):
     """Sample one pair per item; returns ``(images [N, H, W] in [0, 1], masks [N, H, W] uint8)``.
 
     Each item uses its own first prompt pair (empty-prompt guidance) and the
@@ -312,13 +328,17 @@ def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidanc
     from ``start_latents`` of those items at the first sampling timestep, with
     the same noise draws. ``start_image`` / ``start_mask`` [N, 4, h, w] (clean
     latents, e.g. ``image_start_latents`` / ``mask_latents``) start only that
-    stream that way; a stream without one stays pure noise. Sets ``unet`` to
-    eval mode and releases the JCA attention maps afterwards.
+    stream that way; a stream without one stays pure noise. ``prompts`` (one
+    ``(image_prompt, mask_prompt)`` per item, embeddings already in
+    ``cache["text"]``) replaces each item's own first prompt pair. Sets
+    ``unet`` to eval mode and releases the JCA attention maps afterwards.
     """
     items = list(items)
     condition_items = items if condition_items is None else list(condition_items)
     if len(condition_items) != len(items):
         raise ValueError("condition_items must match items")
+    if prompts is not None and len(prompts) != len(items):
+        raise ValueError("prompts must match items")
     if start_from is not None and len(start_from) != len(items):
         raise ValueError("start_from must match items")
     for name, clean in (("start_image", start_image), ("start_mask", start_mask)):
@@ -332,7 +352,10 @@ def generate(unet, vae, scheduler, cache, items, *, num_inference_steps, guidanc
     for start in range(0, len(items), batch):
         chunk = items[start : start + batch]
         z_pre, m_pre = _conditions(cache, condition_items[start : start + batch], device, dtype)
-        image_text, mask_text = _first_prompts(cache, chunk, device, dtype)
+        if prompts is None:
+            image_text, mask_text = _first_prompts(cache, chunk, device, dtype)
+        else:
+            image_text, mask_text = _embed_pairs(cache, prompts[start : start + batch], device, dtype)
         empty = cache["text"][""].to(device=device, dtype=dtype).expand(len(chunk), -1, -1)
         # The same draw sample_pairs would make, so pure-noise runs are unchanged.
         scheduler.set_timesteps(num_inference_steps, device=device)
@@ -679,8 +702,41 @@ def save_overfit_pages(path, rows, *, title, rows_per_page=4, **grid_options):
     return pages
 
 
-def prompt_caption(cache, item):
-    """The text conditioning of one cached slice, as shown on the grids."""
+def prompt_caption(cache, item, pair=None):
+    """The text conditioning shown on the grids: ``pair`` or the slice's own first prompt pair."""
     patient, z = item
-    image_prompt, mask_prompt = cache["patients"][patient]["prompts"][z][0]
+    image_prompt, mask_prompt = cache["patients"][patient]["prompts"][z][0] if pair is None else pair
     return f"image prompt: {image_prompt}\nmask prompt: {mask_prompt}"
+
+
+def class_set(mask, *, pixel_mm, presence_mm2):
+    """Label IDs whose area reaches ``presence_mm2[str(id)]`` (mm2) on a 2D mask, sorted."""
+    mask = np.asarray(mask)
+    area = float(pixel_mm) ** 2
+    return tuple(int(c) for c in sorted(presence_mm2, key=int) if (mask == int(c)).sum() * area >= presence_mm2[c])
+
+
+def text_control_readings(scenarios, reading):
+    """Preregistered Test A readings from ``{scenario: [{"requested", "own", "generated"}, ...]}``.
+
+    A generation adheres when its class set equals the requested one; it is
+    counterfactual when the request differs from the slice's own classes, and
+    it keeps its own classes when the generated set equals the own one there.
+    """
+    per_scenario, counterfactual, kept = {}, [], []
+    for name, rows in scenarios.items():
+        adhered = [tuple(r["generated"]) == tuple(r["requested"]) for r in rows]
+        cf = [tuple(r["requested"]) != tuple(r["own"]) for r in rows]
+        per_scenario[name] = {
+            "adherence": sum(adhered), "slices": len(rows),
+            "counterfactual_adherence": sum(a for a, c in zip(adhered, cf) if c), "counterfactual": sum(cf),
+        }
+        counterfactual += [a for a, c in zip(adhered, cf) if c]
+        kept += [tuple(r["generated"]) == tuple(r["own"]) for r, c in zip(rows, cf) if c]
+    total, followed = len(counterfactual), sum(counterfactual)
+    return {
+        "per_scenario": per_scenario,
+        "counterfactual_adherence": followed, "counterfactual_total": total,
+        "counterfactual_kept_own_classes": sum(kept),
+        "text_controls_classes": followed >= reading["counterfactual_adherence_min"],
+    }

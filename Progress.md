@@ -171,3 +171,15 @@ Next smallest steps:
 Added /graphify-out/ to .gitignore at the user's request. Verified the directory
 is ignored, has no tracked files and no longer appears in git status. The focused
 whitespace check passed. No model or dataset files were changed in this step.
+
+## 2026-11-04 — Text control and caption check prepared
+
+Prepared at the user's request, NOT RUN:
+`notebooks/RHUH_GBM_Colab_text_control_captions.ipynb`, config block
+`text_control_captions_v1`.
+- Test A checks whether the class text steers the generated mask under the
+  pre-op-pair start.
+- Test B records what two open VLMs say about pre-op slices and whether it
+  fits CLIP's 77 tokens.
+About 25 minutes on Colab, no training. Next: run it and review the results
+before Stage 5.

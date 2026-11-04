@@ -252,5 +252,35 @@
       "specificity_margin": 6
     },
     "decision": "diagnostic only, no PASS. preop_pair_start_justified needs: the weights reproduce r3 (both reference arms within 0.005 whole-slice MAE); masks follow (mask_patient_top1 >= 14 and label-free labels <= 100 mm2 mean); the image anchor is kept (patient_top1 >= 14 and whole-slice MAE <= 1.25 x the image-only arm); the start is patient-specific (patient_top1 exceeds the wrong-patient arm by >= 6). Then the pre-op-pair start is declared as a Stage 5 sampling arm next to pure noise"
+  },
+  "text_control_captions_v1": {
+    "purpose": "two small checks before Stage 5, no training. A: does the class text steer the generated mask under the declared pre-op-pair start? B: what do open VLMs say about pre-op slices, and does it fit CLIP?",
+    "fixed": "2026-11-04, before the run",
+    "weights": "stage4/r3/unet_step000500.pt",
+    "slices": "the stage4_overfit selection (16 training slices)",
+    "A_text_control": {
+      "sampler": "pre-op pair start at t = 981, as the r4 arm pair_own_preop",
+      "scenarios": {"own": "each slice's own target-informed prompt (repeats r4)", "none": [], "id2": [2], "id2_id3": [2, 3]},
+      "prompt_variant": "first class order, as in every Stage 4 run",
+      "presence_mm2": {"1": 10.0, "2": 10.0, "3": 5.0},
+      "adherence": "the generated mask's class set (classes reaching the presence area) equals the requested set",
+      "r4_pair_own_preop_slice_mae": 0.01927669736323878,
+      "r4_tolerance": 0.005,
+      "reading": {"counterfactual_adherence_min": 24},
+      "decision": "diagnostic only: text_controls_classes when at least 24 of the 32 counterfactual generations (request differs from the slice's own classes) adhere"
+    },
+    "B_caption_feasibility": {
+      "input": "the 16 pre-op slices only (available at inference), anterior up as on the grids; never post-op slices; local open models only, never an external service",
+      "models": {"general": "Qwen/Qwen2.5-VL-7B-Instruct", "medical_candidates": ["google/medgemma-4b-it"]},
+      "styles": {
+        "terms": "This is one axial slice of a contrast-enhanced T1-weighted brain MRI, skull-stripped, acquired before surgery. List the visible findings as short medical terms separated by commas, at most 10 words in total. If you see no abnormality, answer: no visible abnormality.",
+        "sentences": "This is one axial slice of a contrast-enhanced T1-weighted brain MRI, skull-stripped, acquired before surgery. Describe the visible findings in two or three sentences."
+      },
+      "max_new_tokens": {"terms": 48, "sentences": 160},
+      "decoding": "greedy",
+      "token_limit": 77,
+      "flags": "keyword mentions_abnormality (negated phrases removed) and says_normal, compared with whether the slice has any pre-op label",
+      "decision": "descriptive only: captions, CLIP token counts (alone and inside the image template) and the agreement table; nothing is trained on them"
+    }
   }
 }
