@@ -149,8 +149,20 @@ Stage 4 r4 prepared (user-approved), NOT RUN.
 - Config block `stage4_r4_pair_start`; runner
   `notebooks/RHUH_GBM_Colab_stage4_r4.ipynb`.
 
+Stage 4 r4 on Colab (commit 3fde76b): `preop_pair_start_justified`.
+- Starting both streams from the noised pre-op pair nearly matches the oracle:
+  whole-slice MAE 0.019 vs 0.016; right patient 15/16 for images and masks;
+  label-free slices empty.
+- The wrong-patient control drops to 7/16.
+- The pre-op-pair start is now a declared Stage 5 sampling arm next to pure
+  noise.
+
 Next smallest steps:
-1. Run Stage 4 r4 on Colab (about 12 minutes, no training).
+1. User decision: close Stage 4 by a documented deviation (every computable
+   check passes post hoc with the pre-op-pair sampler), or repeat Stage 4 with
+   that sampler declared from the start.
+2. Draft and preregister the Stage 5 pilot for approval: 1,000 steps on all
+   training slices, both samplers, validation patients only.
 2. Stage 5 (1,000-step pilot) needs a Stage 4 PASS, or an approved deviation.
 3. Optional: an affine registration variant (policy v2) to recover quarantined pairs.
 

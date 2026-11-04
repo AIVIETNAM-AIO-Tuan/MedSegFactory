@@ -541,3 +541,39 @@ git ls-files found no tracked files under that directory. No files were deleted.
   `notebooks/RHUH_GBM_Colab_stage4_r4.ipynb`, about 12 minutes.
 - Tests: 29 overfit tests; 7/7 planted mutations caught. The CPU smoke run of
   the notebook passed end to end, with the saved weights reloading identically.
+
+## 2026-11-04 — Stage 4 r4 result (Colab; commit 3fde76b): preop_pair_start_justified
+
+- Sampling only from the r3 weights (SHA256 a9871feb8eb4..., 814 tensors,
+  strict load). Took 9 minutes; peak 32 GiB.
+- The weights reproduce r3 exactly: whole-slice MAE 0.2393 (pure noise) and
+  0.0264 (pre-op image only).
+
+  | Arm | whole-slice MAE | right patient (image / mask) | own slice (image / mask) | ID-2 Dice | ID-3 Dice, found | label-free labels | brain MAE (copy 0.096) |
+  |---|---|---|---|---|---|---|---|
+  | pure noise | 0.239 | 4 / 4 | 1 / 4 | 0.40 | 0.41, 2/4 | 1,078 mm2 | 0.136 |
+  | pre-op image only | 0.026 | 14 / 9 | 8 / 7 | 0.68 | 0.61, 3/4 | 692 mm2 | 0.061 |
+  | pre-op pair | 0.019 | 15 / 15 | 10 / 12 | 0.74 | 0.52, 3/4 | 0 | 0.045 |
+  | post-op pair (oracle) | 0.016 | 15 / 16 | 13 / 14 | 0.91 | 0.85, 4/4 | 0 | 0.037 |
+  | wrong-patient pre-op pair | 0.058 | 7 / 12 | 6 / 9 | 0.48 | 0.38, 2/4 | 0 | 0.111 |
+
+- Preregistered checks: weights reproduce, masks follow, image kept,
+  patient-specific (15 vs 7). Verdict `preop_pair_start_justified`. As
+  preregistered, the pre-op-pair start at t = 981 becomes a declared Stage 5
+  sampling arm next to pure noise.
+- Caveats:
+  - The wrong-patient mask figure (12/16) is inflated: label-free slices take
+    empty pre-op masks from label-free slices, which count as own matches by
+    the tie rule.
+  - On 16 memorized training slices, the start only has to point at a
+    memorized answer, so this does not show generalization.
+  - The text is target-informed (oracle) in all Stage 4 runs.
+- Grid: images correct on nearly every row; label-free slices empty; one
+  patient's ID-3 slice got another patient's small tumour mask. In the control,
+  outputs follow the wrong patient except where the text disagrees.
+- Stage 4 status: r1-r3 were ITERATE under pure-noise sampling. Scored post
+  hoc with the pre-op-pair sampler, every Stage 4 check that can be computed
+  from r4 passes: ID-2 0.74, ID 3 3/4, 0 mm2 label-free, 0.03 mm2 invented
+  ID 1, brain MAE 0.045 below copy 0.096 and below the control 0.111. The
+  step-0 comparison was not measured. Moving to Stage 5 needs the user's
+  decision.
