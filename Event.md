@@ -587,3 +587,78 @@ git ls-files found no tracked files under that directory. No files were deleted.
   weights, slices, seeds and arms) only to redraw it in this format. It also
   saves the generated arrays, so later grids need no rerun, and it compares
   its numbers with the r4 record. It is not a new experiment.
+
+## 2026-11-04 - User selected preoperative-only VLM scenario prompting
+
+- The user proposed a small text-conditioning experiment before Stage 5:
+  direct postoperative terms, general-VLM sentences, medical-VLM terms and
+  medical-VLM sentences.
+- Confirmed input policy: only preoperative MRI plus a hypothetical postoperative
+  scenario supplied by the user; no actual postoperative images or labels to VLMs.
+- Confirmed model choices: Qwen3-VL-4B-Instruct and MedGemma-1.5-4B-it in Colab.
+  The actual scenario is pending. Model access/terms have not been verified.
+- Draft card EXP-2026-002 separates caption faithfulness and generator behavior.
+  It recommends adding general-VLM terms, an empty-text control, and distinct
+  scenario controls. All final arms and scenario-specific criteria remain draft.
+- Existing Stage 4 weights and the preoperative-pair sampler are the proposed
+  frozen baseline. No new training. No actual-postoperative reconstruction score
+  is an accuracy endpoint for an independently supplied hypothetical outcome.
+- No model download, external VLM/API call, patient transfer or inference run.
+
+
+## 2026-11-04 - Three supplied scenarios received; RANO mapping checked
+
+- User requested partial, near-total and gross-total resection scenarios, keeping
+  the surgical site related to the preoperative tumor region and permitting
+  slight local brain shift.
+- The user's class-3/class-2/class-1 associations were checked against the
+  original RANO resect paper and a primary validation category table. Class 1
+  requires a nonenhancing-residual criterion in addition to absent enhancement;
+  gross-total enhancing resection alone does not establish that class.
+- A clarification about scenario 3 is pending. The draft retains the user's
+  original intent and records the distinction; no clinical class is assigned.
+- Sparse 2D T1ce generations will not be presented as verified 3D RANO classes.
+  RHUH segmentation IDs remain separate from RANO category numbers.
+- No inference, model download, training or data transfer.
+
+
+## 2026-11-04 - Scenario 3 resolved; text-screen design ready
+
+- User explicitly chose to keep T1ce and define scenario 3 as no residual
+  enhancing tumor, without assigning RANO resect class 1.
+- EXP-2026-002 now records the three intended residual-enhancement levels and
+  the shared original-tumor-site/slight-local-shift constraints.
+- Five prompt recipes (direct terms, general terms/sentences, medical
+  terms/sentences), empty text and shuffled scenario controls form the small
+  fixed-model screen. Initial maximum: 336 pairs on the existing 16 training
+  slices, three scenarios and seed 11, with shared identical controls reusable.
+- Caption faithfulness and generated scenario adherence are separate endpoints.
+  No actual postoperative reconstruction metric is used to judge a different
+  hypothetical outcome. No RANO-volume or 3D brain-shift claim from sparse slices.
+- Documentation preparation only; implementation and inference are not run.
+
+
+## 2026-11-04 - Separate EXP-2026-002 scenario screen implemented
+
+- User clarified that Claude is implementing a different text/caption test; keep
+  the two experiments separate. EXP-2026-002 uses scenario_text.py,
+  scenario_probe.py, its own config/CLI/notebook and private output directory.
+  Claude's caption_check.py and text-control config were not modified.
+- A temporary filename collision was resolved by moving this new runner to
+  scenario_probe.py. The earlier caption implementation is preserved under
+  caption_check.py, with matching function bodies verified independently.
+- Added preoperative-only inputs, two local VLM caption styles, full-prompt
+  token checks, raw rejected-caption records, fixed paired noise, scenario-area
+  summaries, saved arrays and private prompt-captioned grids. No actual
+  postoperative target is read or scored by the new runner.
+- Identical shuffled prompts are inapplicable controls. Scenario ordering is NA
+  when rejected captions make the compared case sets incomplete.
+- Validation: 42 focused CPU tests passed across the combined run and the
+  single fixture rerun after creating its missing temporary parent. Real
+  preoperative-only loading: 16 slices/four patients, eight outside-tumor slices.
+  CLI help, syntax/nbformat validation and a visually checked synthetic-fixture
+  grid smoke render passed. No live VLM/CLIP-tokenizer/diffusion inference.
+- Ignored local test archive SHA256:
+  747da6622e3c7f0a1335049d5d2966f0c7409a013bcd2937551431ca74e0da95.
+- No commit, push, patient transfer, model download or training. The Colab
+  notebook requires the pushed code, saved r3 weights and HF model access.

@@ -171,3 +171,28 @@ Next smallest steps:
 Added /graphify-out/ to .gitignore at the user's request. Verified the directory
 is ignored, has no tracked files and no longer appears in git status. The focused
 whitespace check passed. No model or dataset files were changed in this step.
+
+## 2026-11-04 - Supplied-scenario VLM text experiment design
+
+EXP-2026-002 is IMPLEMENTED_NOT_RUN. The user selected preoperative MRI plus
+a user-supplied hypothetical postoperative scenario as the VLM input, and
+Qwen3-VL-4B-Instruct / MedGemma-1.5-4B-it running in the approved Colab environment.
+Three scenarios have been received: partial, near-total and gross-total
+resection, with the original tumor/surgical-site relation retained and slight
+local displacement allowed. The user confirmed that scenario 3 means no residual
+enhancing tumor, without assigning RANO class 1; T1ce and sparse slices cannot
+verify the nonenhancing 3D criterion.
+The draft separates
+caption fidelity from generator control, preserves the CLIP token limit, and
+does not score hypothetical outcomes against the actual postoperative result.
+A general-VLM terms arm completes the style comparison. Five prompt recipes plus
+empty/shuffled controls are planned, using the saved model and paired seed 11;
+at most 336 generated pairs across the three supplied scenarios.
+Separate files: scenario_text.py, scenario_probe.py, EXP-2026-002.json,
+run_scenario_probe.py and RHUH_GBM_Colab_scenario_probe.ipynb. Claude's caption
+feasibility/text-control test keeps its own files and config.
+42 focused CPU tests passed; real preoperative-only loading passed for all 16
+selected slices. CLI help, syntax/notebook checks and synthetic grid rendering
+passed. An immutable ignored test snapshot is stored privately. No actual VLM,
+CLIP-tokenizer or diffusion GPU run was performed; the new model comparison is
+NOT MEASURED. Saved r3 GPU weights are on Drive and absent locally.
