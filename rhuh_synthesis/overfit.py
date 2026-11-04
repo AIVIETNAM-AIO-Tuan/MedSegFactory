@@ -628,12 +628,14 @@ def stage4_decision(training_log, steps, first, final, shuffled, criteria):
 MASK_COLORS = ("black", "gold", "limegreen", "red")  # IDs 0, 1, 2, 3
 
 
-def save_overfit_grid(path, rows, *, title):
+def save_overfit_grid(path, rows, *, title, panel_inches=3.2, dpi=110):
     """PNG of pre-op, target, generated MRI and target/generated masks, one row per slice.
 
-    ``rows`` are dicts with ``name`` and the five 2D arrays ``pre_image``,
-    ``post_image``, ``generated_image``, ``label``, ``generated_mask``. The
-    figure shows patient images: keep it in the private run directory.
+    ``rows`` are dicts with ``name``, the five 2D arrays ``pre_image``,
+    ``post_image``, ``generated_image``, ``label``, ``generated_mask`` and
+    optionally ``caption`` (for example the row's text prompts), printed above
+    the row. Each panel is ``panel_inches`` wide at ``dpi``. The figure shows
+    patient images: keep it in the private run directory.
     """
     from pathlib import Path
 
@@ -643,19 +645,28 @@ def save_overfit_grid(path, rows, *, title):
     columns = (("pre-op", "pre_image"), ("post-op target", "post_image"), ("generated", "generated_image"),
                ("target mask", "label"), ("generated mask", "generated_mask"))
     labels = ListedColormap(MASK_COLORS)
-    figure = Figure(figsize=(2.0 * len(columns), 2.0 * len(rows)), layout="constrained")
-    axes = np.atleast_2d(figure.subplots(len(rows), len(columns)))
-    for r, row in enumerate(rows):
-        for c, (heading, key) in enumerate(columns):
-            ax = axes[r, c]
+    row_inches = panel_inches + 0.6
+    figure = Figure(figsize=(panel_inches * len(columns), row_inches * len(rows) + 0.4), layout="constrained")
+    for subfigure, row in zip(np.atleast_1d(figure.subfigures(len(rows), 1)), rows):
+        axes = subfigure.subplots(1, len(columns))
+        for ax, (heading, key) in zip(axes, columns):
             if key in ("label", "generated_mask"):
                 ax.imshow(row[key], cmap=labels, vmin=0, vmax=3, origin="lower", interpolation="nearest")
             else:
                 ax.imshow(row[key], cmap="gray", vmin=0, vmax=1, origin="lower", interpolation="nearest")
-            ax.set_title(f"{row['name']} | {heading}" if c == 0 else heading, fontsize=6)
+            ax.set_title(heading, fontsize=9)
             ax.axis("off")
-    figure.suptitle(title + " | mask colours: ID1 gold, ID2 green, ID3 red", fontsize=8)
+        caption = row.get("caption")
+        subfigure.suptitle(row["name"] + (f"\n{caption}" if caption else ""), fontsize=9, x=0.01, ha="left")
+    figure.suptitle(title + " | mask colours: ID1 gold, ID2 green, ID3 red", fontsize=12)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(path, dpi=60)
+    figure.savefig(path, dpi=dpi)
     return path
+
+
+def prompt_caption(cache, item):
+    """The text conditioning of one cached slice, as shown on the grids."""
+    patient, z = item
+    image_prompt, mask_prompt = cache["patients"][patient]["prompts"][z][0]
+    return f"image prompt: {image_prompt}\nmask prompt: {mask_prompt}"
