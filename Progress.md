@@ -217,3 +217,10 @@ Next smallest steps:
    2 hours, resumable).
 2. Review the reading and the grids. `replication_justified` still needs a go-ahead
    for Stage 6; `iterate` records the failed checks and declares one change.
+
+Update after commit 8109c4b: part 2's CPU smoke finished and passed (scoring, grids,
+record, no patient IDs in the shareable block). With a stand-in stack of 60% target and
+40% pre-op image, the V3 primary MAE came out at 0.0748, against about 0.0746 expected,
+which checks the mapping back to the 1 mm frame on real validation data. This run used
+the reading code from before the matched-copy check was added; that check has unit
+tests and was re-run on this smoke record.
