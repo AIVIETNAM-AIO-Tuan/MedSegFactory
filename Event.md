@@ -761,3 +761,15 @@ shown, and the earlier explanation is withdrawn.
   verified. Stage 5 outputs now go to that account's own `MyDrive/EXP-2026-001_stage5/`, so
   writes no longer pass through the shortcut. Inputs are still read through it, then copied
   to local disk.
+
+Update on r1, 2026-11-05: a second check in the r1 session listed `stage5`, `stage5 (1)`,
+`stage5 (2)`, `stage5 (3)` and `stage5 (4)` in the private folder, with 223.8 GiB free on
+Drive and an empty lost-and-found folder.
+- So the folder was not deleted, and a full Drive or a dropped connection is not the
+  explanation. Drive holds several folders with the same name and shows the extras with a
+  number, so `stage5/r1` no longer resolved to r1's folder.
+- Inferred, not proven: the notebook's repeated create-if-missing calls made a new `stage5`
+  whenever the view through the shortcut briefly missed it. How many of the five came from
+  separate attempts is not known.
+- The changes in commit a3b6c14 cover this case: nothing in a run depends on the Drive path
+  until the copy, and the last cell re-copies whatever is missing from the run folder.
