@@ -183,3 +183,17 @@ Prepared at the user's request, NOT RUN:
   fits CLIP's 77 tokens.
 About 25 minutes on Colab, no training. Next: run it and review the results
 before Stage 5.
+
+## 2026-11-05 — Text control and caption check result
+
+Colab run of commit 9ceac13, 10 minutes, no training.
+- Test A: class text does not yet control the mask (20/32 counterfactual, threshold
+  24). Post hoc, only 4/32 also keep the right patient: text mostly selects a
+  memorized pair. Shown only on 16 memorized slices.
+- Test B: sentence captions exceed CLIP's limit on 5-6 of 16 once in the template.
+  Captions contain frequent errors, and the keyword check was unreliable. Pre-op
+  captions carry no information about the outcome.
+
+Next smallest steps:
+1. User decisions: how to close Stage 4; the Stage 5 plan, including a
+   counterfactual text check on validation patients.

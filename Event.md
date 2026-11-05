@@ -622,3 +622,58 @@ git ls-files found no tracked files under that directory. No files were deleted.
 - Tests: 8 new; 7/7 planted mutations caught. Full local suite: 282 passed,
   including EXP-2026-002's tests. The CPU smoke run of the notebook passed end
   to end with tiny models and stub VLMs.
+
+## 2026-11-05 — Text control (Test A) and VLM caption check (Test B) result (Colab; commit 9ceac13)
+
+- Run: 10 minutes, peak 32 GiB. r3 weights SHA256 a9871feb8eb4..., strict load.
+  The own-prompt arm reproduced r4 exactly (whole-slice MAE 0.019277; 16/16
+  adherence). Slices whose request equals their own classes barely changed
+  (image change < 0.01), so the prompt override works as wired.
+- Test A, preregistered reading: 20/32 counterfactual generations adhere (none
+  5/8, ID 2 5/12, ID 2 + ID 3 10/12), below the threshold of 24. Verdict:
+  `text_controls_classes` is FALSE. 8/32 kept their own classes.
+- Test A, post-hoc (NOT preregistered):
+  - Right-patient image: own prompt 15/16; counterfactual 11/32 (none 4/8,
+    ID 2 6/12, ID 2 + ID 3 1/12). Adhered and right patient: 4/32. On the grid,
+    at least one of those 4 still jumped to another brain level.
+  - ID 2 + ID 3 requests: 10/12 counterfactual masks are nearest to one
+    patient's small tumour mask (median Dice 0.87 with the nearest training
+    mask), drawn at the same position whatever the input anatomy.
+  - Image and mask nearest to the same patient: own prompt 7/8; ID 2 6/12;
+    ID 2 + ID 3 8/16.
+  - Grid (4 of 16 pages read): "none" on one patient's labelled slices kept the
+    brain outline, removed the lesion and emptied the mask. On another patient
+    the image lost its lesion and cavity but the ID-2 mask stayed, so the pair
+    contradicts itself. ID 2 + ID 3 often replaced the input with another
+    patient's slice.
+  - Reading: in this model, trained on 16 slices and 3 prompt types, text mostly
+    selects a memorized pair rather than editing the input. The prompt types were
+    confounded with slice identity in training, so this does not predict
+    behaviour after training on all slices.
+- Test B, descriptive: both VLMs ran locally. One reader's post-hoc reading by
+  Claude (not a radiologist) of the 16 pre-op slices (4 patients, not independent):
+
+  | Model, style | Lesion named, 8 labelled | False finding, 8 label-free | CLIP tokens mean / max | Over 77 in template |
+  |---|---|---|---|---|
+  | Qwen2.5-VL-7B terms | 2/8 | 0/8 | 8.7 / 18 | 0/16 |
+  | Qwen2.5-VL-7B sentences | 8/8 | 5/8 | 65.9 / 98 | 6/16 |
+  | MedGemma-4B terms | 7/8 | 2/8 | 13.9 / 20 | 0/16 |
+  | MedGemma-4B sentences | 8/8 | 2/8 (one hedged) | 60.9 / 76 | 5/16 |
+
+- Test B problems in this probe's own design:
+  - The preregistered keyword flag is unreliable: it counts "contrast enhancement"
+    echoed from the prompt and misses some negations, reporting 8/8, 4/8 and 7/8
+    label-free mentions where the reading above gives 5/8, 2/8 and 2/8.
+  - The terms prompt offered "no visible abnormality" as an answer. Qwen gave it
+    on 14/16 slices, so its 2/8 may reflect the prompt.
+  - "acquired before surgery" may have prompted MedGemma's "surgical site" on two
+    pre-op slices.
+- Other caption errors: Qwen placed a "parietal" lesion on 5 skull-base slices
+  and named diagnoses a single slice cannot establish; MedGemma twice reversed
+  gray/white brightness for T1. Left/right is unverifiable: the image has no side
+  marker.
+- Proposed, not decided: keep deterministic class terms as generator text; do not
+  use pre-op VLM captions as generator text, since they describe the tumor about
+  to be removed and repeat what the pre-op pair already supplies; add counterfactual
+  text control to Stage 5 on validation patients, counting adherence only when the
+  anatomy stays with the patient.
