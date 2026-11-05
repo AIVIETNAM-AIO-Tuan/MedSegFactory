@@ -258,3 +258,23 @@ Next smallest steps:
    training on the r2 weights (own against wrong pre-op channels, guidance sweep).
 2. If the pre-op channels turn out to be ignored, test a higher learning rate for those
    channels only, as one declared change.
+
+
+## 2026-11-05 ? EXP-2026-003 MSF diagnostic development
+
+Implemented a separate frozen-weight diagnostic and detailed experiment card at
+experiments/registry/EXP-2026-003.md. It distinguishes native MSF's text-only task
+from our preoperative adaptation; Stage5 Part2 remains pending.
+- D0: original4-channel / zero-expanded equivalence and invariance controls.
+- D1: matched-target/noise/text channel interventions, separate MRI and mask,
+  per-patient/ROI readouts with missing-region denominators. Default: loss only.
+- D2 optional: channel-versus-initialization factorial and guidance sweep;126
+  planned validation pairs. No optimizer or new training.
+- Verification:40 focused local tests passed; parent audit verified1000finite
+  log entries and13preview files/180pairs. Real preparation yields30cases,
+  including two separately labeled oracle residual sentinels. CLI, config,
+  syntax and notebook checks passed. No GPU diagnostic or model-quality result.
+- Reusable logic is in Python modules; the new Colab notebook clones a separate
+  branch, stages approved data locally and writes through Drive IDs with MD5.
+Next: run the notebook with PHASE=loss, then inspect paired effects before
+choosing one development change or launching more training.

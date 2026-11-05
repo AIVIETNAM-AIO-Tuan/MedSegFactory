@@ -849,3 +849,25 @@ numbers are post hoc and descriptive. No clinical claim follows.
   loses nothing. This departs from the notebook's note to run it whatever the previews show.
   Run a short GPU diagnostic without training first: own against wrong pre-op channels by
   fixed-noise loss, and a guidance sweep for brightness and contrast.
+
+
+## 2026-11-05 ? EXP-2026-003 preregistered and implemented (Codex)
+
+User requested a detailed original-MSF diagnostic plan and development. Added
+EXP-2026-003 as a separate experiment; no EXP001/EXP002 code or completed record
+was changed. Frozen author checkpoint5d47436f9029 and Stage5r2 weightsffdcb9cda754.
+- Original MSF is a native text-to-pair control, not a patient-preserving model.
+  Our hypothesis concerns the adaptation under the pilot budget, not an MSF ceiling.
+- Separate clean-channel dependence from noised-start dependence. Same target,
+  text and per-case noise across arms; MRI/mask interventions scored separately.
+- Preserve parent preview selection and add two explicitly oracle-selected
+  validation residual sentinels; never mix them into the parent or training.
+- Supported scoring ROIs inherit the5% exclusion cap. Empty ROI values stayNA;
+  summaries state valid-patient/case denominators. Sensitivity alone is not utility.
+- Source-based per-case sampling is a new matched draw, not a bit-exact replay
+  of parent batch2 previews. Donor slice-level mismatch is a stated confound.
+- No new optimizer steps, loss or architecture. A follow-up training change
+  requires a new evidence-based card; Stage5's formal full-volume reading is pending.
+- Local tests:40passed. Parent artifacts and real source preparation checked;
+  no GPU run or CPU simulation of a GPU experiment. Private test snapshot SHA256:
+  4820bdba858a1fb75187b4603316ba4a23d5090fb0540ca7d410f8ddeb9180f7.
