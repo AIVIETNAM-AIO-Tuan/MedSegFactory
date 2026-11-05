@@ -282,5 +282,72 @@
       "flags": "keyword mentions_abnormality (negated phrases removed) and says_normal, compared with whether the slice has any pre-op label",
       "decision": "descriptive only: captions, CLIP token counts (alone and inside the image template) and the agreement table; nothing is trained on them"
     }
+  },
+  "stage5_pilot": {
+    "purpose": "reproduce the MSF recipe with the pre-op adaptation: 1,000 steps on all accepted training patients with class-term text, compared with the copy control on validation patients only; the test set stays sealed",
+    "fixed": "2026-11-05, before any Stage 5 run",
+    "stage4_closure": "documented deviation: the user moved to Stage 5 on 2026-11-05. r1-r3 were ITERATE under pure-noise sampling; r4 passed under the pre-op-pair start, and every Stage 4 check computable from r4 passes post hoc (the step-0 comparison was not measured)",
+    "training": {
+      "patients": "training patients accepted by the frozen registration policy",
+      "text": "TARGET_INFORMED class terms: every class order per slice, reference text dropout",
+      "steps": 1000,
+      "microbatch_pairs": 4,
+      "accumulation": 5,
+      "precision": "bf16",
+      "weights_saved_at": 1000
+    },
+    "previews": {
+      "at_steps": [0, 500, 1000],
+      "step_0_purpose": "the MSF checkpoint with the zero adapter, before any RHUH training, with the same starts: shows how much of any effect comes from training rather than the starting point",
+      "training_slices": "the stage4_overfit selection",
+      "validation_slices_per_patient": {"labelled": 2, "label_free": 2, "min_gap": 3, "min_brain_fraction": 0.5},
+      "validation_selection": "pre-op data only",
+      "samplers": ["pair_preop", "pure_noise"],
+      "seed": 11,
+      "batch_pairs": 2,
+      "wrong_patient_control": "at the last step, validation slices only: pre-op pair and pre-op channels from the next patient's same-position slice, own text",
+      "eval_loss_timesteps": [100, 300, 500, 700, 900, 981],
+      "eval_loss_noise_seed": 20261103,
+      "eval_loss_batch": 4,
+      "eval_loss_slices": "training previews and validation previews, reported separately; validation post-op latents serve only as the loss target, never as a generator input",
+      "evaluation_precision": "fp32"
+    },
+    "validation": {
+      "patients": "validation patients accepted by the frozen policy; quarantined patients stay NA and are counted",
+      "evaluated_step": 1000,
+      "text": "TARGET_INFORMED first class order per slice: an oracle condition, labelled as such. Post-op images are never encoded or fed to the generator",
+      "slices": "every exported axial slice",
+      "samplers": {
+        "pair_preop": {"seeds": [11, 22, 33], "start": "image and mask streams from the noised pre-op pair at t = 981"},
+        "pure_noise": {"seeds": [11], "start": "both streams from pure noise; tests whether the pre-op channels alone carry the anatomy"}
+      },
+      "noise": "independent per slice, one seeded generator per stack",
+      "batch_pairs": 8,
+      "batch_fallback": "halved on a GPU out-of-memory error; the batch used is recorded per stack (it changes the noise draws, not the procedure)",
+      "precision": "fp32",
+      "stacks": "saved per patient, sampler and seed; an interrupted evaluation resumes and metrics are computed from the saved stacks"
+    },
+    "diagnostics": {
+      "intensity_matched_copy": "oracle control: the pre-op image after the best global linear intensity map to the real target, fitted on the stable ROI with target support. No surgical edit happens, so a model that does not beat it in the primary ROI has shown no gain beyond a global intensity change. Before any model output, this control alone gained 0.012 to 0.031 over the plain copy on the three validation patients, above the 0.01 meaningful delta, so the decision rule also requires beating it",
+      "pre_label_copy_extras": "the pre-op labels scored with the same ID-3 and ID-2 mask measures as the generated masks",
+      "through_plane": "mean absolute difference between adjacent axial slices inside the pre-op brain with target support: generated, real target and copy; number of 3D components of generated and reference labels. Descriptive baseline for a later 2.5D or 3D study",
+      "diversity": "mean pairwise whole-brain MAE between seeds of one patient, and ID-3 volume per seed",
+      "copying": {
+        "thumbnail_factor": 8,
+        "top_k": 5,
+        "rule": "for each generated slice with brain, MSE over its own pre-op brain to every training post-op slice on the crop grid, against its own real target; closer_to_training_fraction is the share of slices nearer to some training slice than to their own target. The pre-op image gets the same measure as the reference",
+        "masks": "for each generated slice with ID 3, the top 5 training slices by 2D ID-3 Dice on the crop grid, retained privately; reported, not a decision check"
+      },
+      "review_grid_seed": 11,
+      "review_grid_evenly_spaced": 6,
+      "review_grids": "the review seed of each sampler: per patient, evenly spaced brain slices plus the slices with the largest area of pre-op labels, post-op labels, post-op ID 3 and generated ID 3; the rule is fixed before any output is seen; native-size panels with the prompts on each row"
+    },
+    "reading": {
+      "primary_sampler": "pair_preop",
+      "meaningful_delta": 0.01,
+      "stable_added_mae_max": 0.005,
+      "copying_fraction_max": 0.5
+    },
+    "decision": "validation comparison only. Replication with train seeds 2027 and 2028 is justified when the primary sampler has complete technical validity, no missing endpoint, a mean primary effect of at least 0.01 with every scored patient improving, a positive mean gain over the intensity-matched copy in the primary ROI, a mean added stable MAE of at most 0.005 and a mean copying fraction of at most 0.5. Otherwise ITERATE. With at most 3 validation patients the bootstrap CI is reported but cannot support PROMOTE, and no clinical claim follows"
   }
 }

@@ -197,3 +197,23 @@ Colab run of commit 9ceac13, 10 minutes, no training.
 Next smallest steps:
 1. User decisions: how to close Stage 4; the Stage 5 plan, including a
    counterfactual text check on validation patients.
+
+## 2026-11-05 — Stage 5 pilot implemented, not run
+
+Stage 4 is closed as a documented deviation (user decision; see Event.md). The
+Stage 5 plan is fixed in config block `stage5_pilot`.
+
+Implemented: `rhuh_synthesis/pilot.py`, `notebooks/RHUH_GBM_Colab_stage5_train.ipynb`
+and `notebooks/RHUH_GBM_Colab_stage5_eval.ipynb`.
+- Local tests: 300 pass, 18 of them new. All 52 deliberate code breaks are caught, after
+  one test was sharpened.
+- CPU smoke runs with tiny random models and real exports: part 1 passed. Part 2 passed
+  generation (stubbed), the out-of-memory fallback and resume; its scoring, grid and
+  record cells were still running at this commit.
+- No real training, generation or GPU run yet, so there is no model result.
+
+Next smallest steps:
+1. Run part 1 on Colab (about 75 minutes), then part 2 with the same `RUN_TAG` (about
+   2 hours, resumable).
+2. Review the reading and the grids. `replication_justified` still needs a go-ahead
+   for Stage 6; `iterate` records the failed checks and declares one change.

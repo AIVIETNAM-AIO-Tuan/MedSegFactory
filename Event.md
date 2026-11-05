@@ -677,3 +677,55 @@ git ls-files found no tracked files under that directory. No files were deleted.
   to be removed and repeat what the pre-op pair already supplies; add counterfactual
   text control to Stage 5 on validation patients, counting adherence only when the
   anatomy stays with the patient.
+
+## 2026-11-05 — Stage 4 closed by documented deviation; Stage 5 pilot preregistered
+
+- User decision: "now move to stage 5 to reproduce MSF first". Stage 4 closes as a
+  documented deviation, not a PASS.
+  - Under pure noise, r1-r3 stayed ITERATE.
+  - Under the pre-op-pair start declared by r4, every Stage 4 check that r4 can
+    compute passes post hoc on the 16 memorized slices: image MAE 0.045 against
+    copy 0.097 and wrong patient 0.111; ID-2 Dice 0.74; ID-3 overlap on 3/4 slices;
+    label-free labels 0 mm2; invented ID 1 0.03 mm2.
+  - The step-0 comparison was not measured. Stage 5 previews now include step 0.
+- Stage 5 preregistered in block `stage5_pilot` before any Stage 5 run.
+  - Training: the 24 accepted training patients, class-term text, 1,000 steps, train
+    seed 2026, otherwise the frozen recipe.
+  - Primary sampler `pair_preop`, seeds 11/22/33. Comparison sampler `pure_noise`,
+    seed 11, the original MSF start.
+  - Scored on full volumes of the accepted validation patients (3 of 6; the other
+    3 stay NA and counted). Target-informed class text, labelled as an oracle.
+  - Reading: replication with seeds 2027/2028 is justified only with complete
+    technical validity, no missing endpoint, a mean primary effect of at least 0.01
+    with every patient improving, a positive mean gain over the intensity-matched
+    copy, a mean added stable MAE of at most 0.005 and a mean copying fraction of at
+    most 0.5. Otherwise ITERATE.
+  - With n = 3 the reading cannot PROMOTE. The mean, not the upper CI, is used for
+    the stable check at this stage, because a 3-patient bootstrap is too coarse. The
+    upper CI <= 0.005 rule still applies to any later PROMOTE claim.
+  - Test set not accessed.
+- Added to the plan's Stage 5, none of it changing the frozen endpoints: step-0
+  previews, a validation fixed-noise loss, a wrong-patient preview control, the
+  pre-op image as the reference for the copying measure, and through-plane and 3D
+  component diagnostics.
+- Also added: an intensity-matched copy, an oracle control. It is the pre-op image
+  after the best global linear intensity map to the real target, fitted on the stable
+  ROI. The primary MAE compares two different scans, so a model could beat the plain
+  copy by shifting overall intensity without any surgical edit.
+  - Measured on the 3 validation patients before any model output (primary MAE, plain
+    copy then matched copy): 0.173 and 0.154; 0.173 and 0.161; 0.186 and 0.156. The
+    gains of 0.012 to 0.031 exceed the 0.01 meaningful delta.
+  - So the Stage 5 replication rule also requires a positive mean gain over this
+    control. The frozen primary endpoint and PROMOTE rule do not change.
+- Two user ideas recorded for later, not tested now:
+  - CE-only outcome groups, since these masks have no non-enhancing class. Among the
+    24 accepted training patients: no CE 17, up to 1 cm3 4, 1-5 cm3 3, above 5 cm3 0.
+    It would be a later arm with its own training, and only 7 patients carry residual
+    CE to learn from.
+  - 2.5D or 3D generation. Full 3D would have 24 training volumes instead of about
+    3,700 slices and would lose the released MSF weights, so it would no longer be an
+    MSF reproduction. Cheaper variants in order: shared starting noise across a
+    patient's slices, neighbouring pre-op slices as extra adapter channels,
+    generation from the previous slice, and zero-initialized through-plane attention.
+    Stage 5's through-plane and 3D component numbers give the first evidence of
+    whether this is needed.
