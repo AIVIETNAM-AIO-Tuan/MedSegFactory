@@ -871,3 +871,48 @@ was changed. Frozen author checkpoint5d47436f9029 and Stage5r2 weightsffdcb9cda7
 - Local tests:40passed. Parent artifacts and real source preparation checked;
   no GPU run or CPU simulation of a GPU experiment. Private test snapshot SHA256:
   4820bdba858a1fb75187b4603316ba4a23d5090fb0540ca7d410f8ddeb9180f7.
+
+
+## 2026-11-05 ? EXP-2026-003 user decision: items 2?5 approved
+
+Recorded approval of plan-review items 2?5, not all Claude comments or numerical
+thresholds. Item 1 (donor matching) remains pending. The later planning-only
+instruction remains in force; no code or model execution was authorized.
+
+
+## 2026-11-05 - EXP-2026-003 donor-matching plan approved
+
+User approved anatomically matched donors, completing items 1-5 of the plan
+review. Updated planning text while preserving Claude comments as review history.
+This approves the plan, not code changes, commits, pushes, GPU runs or training.
+
+
+## 2026-11-05 - EXP-2026-003 approved revisions implemented (Claude)
+
+User instruction: "The plan have been approved, please follow step by step". This ended the
+planning-only pause. Claude implemented the five approved items on branch
+`exp-2026-003-msf-diagnostics`, on top of Codex's version, which was committed first and
+unchanged. The card's approved text was followed where it differs from Claude's review
+comments: the 1.05, 0.10, 10% and 0.03 limits are not used.
+
+- Donors: the next patient in frozen order, in the same split, at the query's physical level,
+  on the donor's own crop, pre-op data only. Off-FOV or empty-brain donors are counted as
+  inapplicable. The ordinal rule is removed.
+- Replay before new draws: the parent's own preparation path, fixed-noise loss with seed
+  20261103, batch 4 and default backend flags against the recorded step 0 and step 1000, the
+  saved previews rescored, and validation generation regenerated (seed 11, batch 2). A
+  mismatch does not stop the run, but the decision then gives no model-mechanism claim.
+- Primary readout: shuffled against own error per timestep, patient, stream and ROI, with an
+  `own_repeat` arm for numerical repeatability and the clean-latent rescaling. Prediction
+  sensitivity is secondary.
+- Generation metrics, D2 by default, uploads after each stage, and the frozen decision table.
+- Fixed before any result, and recorded in the card and config: the operational definitions of
+  each table cell (direction and consistency, with no effect-size gate), noise bands and
+  multiscale filters.
+- Small additions beyond the approved text: the generation replay, and the `own_repeat` arm
+  needed for the repeatability the plan requires. Left out because they are not in the
+  approved plan: C2, C6, C10 and C13's `empty_text`, so H_text_conditioning still has no
+  intervention here.
+- Real local exports, no model: all 30 donors matched at the same level, the rebuilt parent
+  inputs are identical, and the saved previews rescore to 0.140221 and 0.081821 within 3e-8.
+- No GPU run. No diagnostic result, runtime or memory measurement exists yet.

@@ -278,3 +278,30 @@ from our preoperative adaptation; Stage5 Part2 remains pending.
   branch, stages approved data locally and writes through Drive IDs with MD5.
 Next: run the notebook with PHASE=loss, then inspect paired effects before
 choosing one development change or launching more training.
+
+
+## 2026-11-05 ? EXP-2026-003 partial plan approval
+
+The user approved review items 2?5 (parent replay, useful dependence, generation
+metrics and a frozen decision table). Donor-level matching (item 1) remains
+pending explanation. Planning only; no implementation, commit, push or GPU run.
+
+
+## 2026-11-05 - EXP-2026-003 all five planning revisions approved
+
+The user approved item 1 after the donor explanation, completing approval of
+items 1-5. The card now incorporates anatomical-level donors, faithful replay,
+useful per-timestep conditioning, generation metrics and an inconclusive-aware
+decision table. Implementation and execution remain paused; no code changed.
+
+
+## 2026-11-05 - EXP-2026-003 revisions implemented, GPU not run
+
+The approved plan is implemented on branch `exp-2026-003-msf-diagnostics`: matched donors, parent
+replay, per-timestep usefulness, generation metrics and the frozen decision table. Zero training.
+See Event.md and the card. No diagnostic result exists yet; Stage 5 part 2 stays pending.
+
+Next smallest steps:
+1. Run `notebooks/RHUH_GBM_Colab_msf_diagnostics.ipynb` on Colab (estimate 30 to 60 minutes).
+2. Read the replay first. If it does not reproduce, resolve that before any model reading.
+3. Apply the frozen decision row, then choose one next change with its own preregistration.

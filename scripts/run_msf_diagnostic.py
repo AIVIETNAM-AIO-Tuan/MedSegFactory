@@ -14,7 +14,8 @@ def main():
     parser.add_argument("--trained-weights", type=Path)
     parser.add_argument("--original-checkpoint", type=Path)
     parser.add_argument("--output-dir", type=Path)
-    parser.add_argument("--phase", choices=("loss", "full"), default="loss")
+    parser.add_argument("--phase", choices=("loss", "full"), default="full",
+                        help="full is the plan; loss alone is a debugging option and cannot answer generation questions")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--audit-parent-only", action="store_true",
                         help="Read and verify saved parent artifacts without model execution")

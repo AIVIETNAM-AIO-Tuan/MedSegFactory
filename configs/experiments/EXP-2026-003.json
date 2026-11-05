@@ -1,6 +1,6 @@
 {
   "experiment_id": "EXP-2026-003",
-  "config_version": 1,
+  "config_version": 2,
   "parent_record_sha256": "69d05aff68628a0ed644b2dfbf59e5f79d9285ad3c3c2d25a95b51aafec27182",
   "parent_config_sha256": "c689632863117fa7998a4b35d17183dd5f90acbfee07e4895f88a97c569cf8d0",
   "adapted_weights_sha256": "ffdcb9cda7544802e1580ec2bb5b1dfa50ed748dbe2f1191ab95ffdaf700cd2c",
@@ -35,14 +35,15 @@
     "parent_train_previews": true,
     "parent_val_previews": true,
     "oracle_id3_sentinels_per_patient": 2,
-    "sentinel_min_gap": 3
+    "sentinel_min_gap": 3,
+    "donor_rule": "next_patient_same_physical_level"
   },
   "loss_probe": {
     "timesteps": [100, 300, 500, 700, 900, 981],
     "noise_seeds": [20261103, 20261104],
     "batch_pairs": 2,
-    "original_arms": ["own", "shuffle_both", "zero_both"],
-    "arms": ["own", "shuffle_image", "shuffle_mask", "shuffle_both", "zero_image", "zero_mask", "zero_both"]
+    "original_arms": ["own", "own_repeat", "shuffle_both", "zero_both"],
+    "arms": ["own", "own_repeat", "shuffle_image", "shuffle_mask", "shuffle_both", "zero_image", "zero_mask", "zero_both"]
   },
   "sampling": {
     "seed": 11,
@@ -59,10 +60,23 @@
     "equivalence_relative_max": 0.00001,
     "original_invariance_relative_max": 0.00001,
     "weak_prediction_change_max": 0.001,
-    "ineffective_condition_difference_max": 0.00000001
+    "ineffective_condition_difference_max": 0.00000001,
+    "replay_relative_tolerance": 0.001,
+    "replay_generation_mean_abs_tolerance": 0.001,
+    "replay_saved_rescore_abs_tolerance": 0.0001,
+    "noise_bands": {"low": [100, 300], "mid": [500, 700], "high": [900, 981]},
+    "d1_primary": {"model": "adapted_r2", "split": "val", "cohort": "parent_preview", "arm": "shuffle_both",
+                   "stream": "image", "region": "brain", "bands": ["mid", "high"]},
+    "d2_primary": {"model": "adapted_r2", "cohort": "parent_preview", "own_arm": "own_own",
+                   "comparison_arm": "shuffled_channels", "region": "brain"}
+  },
+  "generation_metrics": {
+    "ssim": {"window": 7, "data_range": 1.0, "k1": 0.01, "k2": 0.03, "support_erosion_px": 3},
+    "multiscale_sigma_mm": [2.0, 8.0],
+    "oracle_intensity_fit_roi": "stable"
   },
   "execution": {
-    "default_phase": "loss",
+    "default_phase": "full",
     "precision": "fp32",
     "tf32": false,
     "allow_cpu_model_execution": false,
