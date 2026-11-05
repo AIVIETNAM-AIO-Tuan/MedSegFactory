@@ -52,10 +52,12 @@ def local_copies(paths, folder):
 def mirror(source, target):
     """Copy files from ``source`` to ``target`` that are missing there or differ in size.
 
-    Never deletes, and never raises on an I/O failure, so a lost Drive connection
-    cannot stop a run: the failure comes back as ``error`` and a later call
-    continues. A file appears under its final name only once complete. Returns
-    ``{"copied", "kept", "error"}``.
+    Never deletes, and never raises on an I/O failure, so a Drive problem cannot
+    stop a run: the failure comes back as ``error`` and a later call continues. An
+    interrupted copy has the wrong size, so a later call redoes it. Files are written
+    directly, without a rename on the target: rename on Drive was the one operation
+    new in the run that lost its folder, though it is not shown to be the cause.
+    Returns ``{"copied", "kept", "error"}``.
     """
     source, target = Path(source), Path(target)
     copied, kept = 0, 0
@@ -66,13 +68,34 @@ def mirror(source, target):
                 kept += 1
                 continue
             destination.parent.mkdir(parents=True, exist_ok=True)
-            partial = destination.with_name(destination.name + ".partial")
-            shutil.copyfile(path, partial)
-            os.replace(partial, destination)
+            shutil.copyfile(path, destination)
             copied += 1
     except OSError as error:
         return {"copied": copied, "kept": kept, "error": str(error)}
     return {"copied": copied, "kept": kept, "error": None}
+
+
+def ensure_on_drive(local, target, drive, *, mountpoint="/content/drive", attempts=3):
+    """Copy ``local`` to ``target``, force the upload to finish and confirm that nothing was lost.
+
+    Drive can accept a file and lose it later, so success means that a full ``mirror``
+    found nothing to copy after a flush and remount. ``drive`` is
+    ``google.colab.drive``. Returns the last report; raises RuntimeError if that
+    never happens, while the files stay in ``local``.
+    """
+    report = None
+    for _ in range(attempts):
+        report = mirror(local, target)
+        if report["error"] is not None:
+            drive.mount(mountpoint, force_remount=True)
+            continue
+        drive.flush_and_unmount()
+        drive.mount(mountpoint)
+        report = mirror(local, target)
+        if report["error"] is None and report["copied"] == 0:
+            return report
+    raise RuntimeError(f"Files not confirmed on Drive after {attempts} attempts: {report}. "
+                       f"Everything is in {local}: keep this session open and report")
 
 
 def accepted_patients(patients, export_dir):

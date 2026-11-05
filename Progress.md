@@ -233,3 +233,8 @@ copy to Drive, so a Drive failure does not stop a run. Unit tests and a static c
 pass; the changed notebook lines have not been executed.
 
 Next smallest step: run part 1 with `RUN_TAG = "r2"`, then part 2 with the same tag.
+
+Update: Stage 5 outputs on Colab now go to `MyDrive/EXP-2026-001_stage5/<RUN_TAG>/` in the
+Colab account's own Drive. That account reaches the data through a shortcut to a folder it
+does not own. r1 lost its folder there, and the cause is still not verified. The next step
+is unchanged: run part 1 and then part 2 with `RUN_TAG = "r2"`.

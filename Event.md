@@ -746,3 +746,18 @@ git ls-files found no tracked files under that directory. No files were deleted.
   So the start alone does not beat the copy. r2 measures this again.
 - User decision: no CPU simulation of GPU runs. The changed notebook lines have unit
   tests and a static check, but were not executed before hand-over.
+
+Update on r1, 2026-11-05: a check in the r1 session showed the working folder and the
+link correct and Drive connected, but `stage5/r1` absent. So a dropped connection is not
+shown, and the earlier explanation is withdrawn.
+- No code path in the Stage 5 run deletes a folder. The folder was either moved or
+  deleted outside the notebook, or lost by Drive. The cause is still not verified.
+- Further changes, with no effect on frozen settings or scoring: `mirror` no longer
+  renames files on Drive, since that rename was the one Drive operation new in r1
+  compared with the Stage 4 runs; each notebook checks free Drive space at the start;
+  and a final cell flushes the upload, remounts Drive and confirms every file.
+- The Colab account is not the folder's owner: it has edit permission on the shared
+  folder and reaches it through a shortcut in MyDrive. Whether that caused the loss is not
+  verified. Stage 5 outputs now go to that account's own `MyDrive/EXP-2026-001_stage5/`, so
+  writes no longer pass through the shortcut. Inputs are still read through it, then copied
+  to local disk.
