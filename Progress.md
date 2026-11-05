@@ -244,3 +244,17 @@ Update: Stage 5 outputs now go through the Drive API to
 server MD5 (`rhuh_synthesis/drive_api.py`). Tests use a fake Drive server. The real API
 path first runs in the preflight at the start of part 1, before any GPU time. Next step
 unchanged: run part 1 and then part 2 with `RUN_TAG = "r2"`.
+
+## 2026-11-05 — Stage 5 r2 part 1 reviewed
+
+Training and previews finished without failures; part 2 has not been run. On unseen
+patients the model keeps the coarse shape (correlation +0.77) but invents the anatomy
+(fine +0.06, pre-op copy +0.51), with brain MAE 0.140 against copy 0.082. Slices it trained
+on often come back well, so anatomy comes from memory, not from the pre-op input. Preview
+level and post hoc; see Event.md.
+
+Next smallest steps:
+1. User decisions: whether to hold part 2, and whether to run a short GPU diagnostic without
+   training on the r2 weights (own against wrong pre-op channels, guidance sweep).
+2. If the pre-op channels turn out to be ignored, test a higher learning rate for those
+   channels only, as one declared change.

@@ -794,3 +794,58 @@ Drive and an empty lost-and-found folder.
   are unchanged.
 - A run on commit ff3e060 may have started before this change. It would write to
   `MyDrive/EXP-2026-001_stage5/r2`, and the user was asked to stop it.
+
+## 2026-11-05 — Stage 5 r2 part 1 result (training and previews)
+
+Colab run of commit 969f67c: 1,000 steps with finite loss. All 62 files were confirmed
+on Drive by server MD5, and the downloaded weights match the recorded hash ffdcb9cda754.
+Training took 38 minutes, the run 63 minutes, with a 64.9 GiB peak.
+
+Part 2 has not been run, so no preregistered reading exists. Everything below comes from
+preview slices (16 training, 12 validation, seed 11). The scale, exposure and brightness
+numbers are post hoc and descriptive. No clinical claim follows.
+
+- Fixed-noise image loss at steps 0/500/1000: training previews 0.0868/0.0505/0.0461,
+  validation previews 0.0896/0.0578/0.0580. After step 500, validation improved only at
+  t >= 900. The training previews include oversampled CE slices, so this gap is not a
+  general train-validation measure.
+- Validation, step 1000, `pair_preop`: brain MAE 0.140 against plain copy 0.082 and
+  intensity-matched copy 0.064; SSIM 0.36 against 0.61. Step 0 was 0.300, so training
+  helped.
+- Correlation with the real scan inside the brain:
+
+  | Scale | Generated | Pre-op copy | Wrong patient | Pure noise |
+  |---|---|---|---|---|
+  | Coarse, above 8 mm | +0.77 | +0.81 | +0.65 | +0.50 |
+  | Medium, 2-8 mm | +0.23 | +0.67 | +0.08 | +0.07 |
+  | Fine, below 2 mm | +0.06 | +0.51 | +0.01 | +0.01 |
+
+  Generated fine-scale energy is 1.17 times the target's, so detail is invented, not
+  blurred.
+- Memorization: patient B's CE slices, trained about 21 times each, reach medium +0.88 and
+  +0.91 and MAE 0.05 (copy 0.12). Its label-free slices, trained about 3 times each, reach
+  +0.15 and +0.09 and MAE 0.18 (copy 0.10). Across the 16 slices, Spearman with training
+  exposure is +0.69 at medium and +0.75 at fine scale (slices are not independent).
+- Brightness: generated brain is darker by 0.065 on validation. A per-slice oracle linear
+  fit lowers MAE from 0.140 to 0.087.
+- Pre-op channels: the pre-op image channels of `conv_in` have 1.1% of the norm of the
+  noisy-latent channels and the pre-op mask channels 1.5%. The largest pre-op image weight
+  is 0.0071, against an Adam limit of about 0.01 at lr 1e-5 for 1,000 steps.
+- A check that failed: a no-weights rule copying the pre-op latent did not beat the model
+  at any noise level (latent error at t = 981: model 0.157, copy 0.203). MSE rewards a
+  blurry average, so this neither shows nor excludes use of the pre-op channels. A direct
+  test needs fixed-noise loss with own against wrong pre-op channels.
+- Masks:
+  - Label-free slices are empty in training and validation previews.
+  - On training CE slices, ID 3 overlaps on 4/4 but is too small (5-105 mm2 against
+    84-191 mm2), with Dice 0.05-0.44, below copying the pre-op ID 3 on 3 of 4.
+  - On validation, labels follow the pre-op mask (Dice 0.60-0.75) more than the target
+    (0.15-0.48), and are no better than the copy (0.26-0.55) on the four slices where the
+    target has labels.
+  - The validation previews hold no post-op ID 3, so CE on unseen patients is untested.
+- Design gap: post-op masks have no cavity class, and the prompts cannot mention one. A
+  slice with a large cavity gets "no annotated compartment".
+- Proposed, not decided: hold part 2, since the weights stay on Drive and postponing it
+  loses nothing. This departs from the notebook's note to run it whatever the previews show.
+  Run a short GPU diagnostic without training first: own against wrong pre-op channels by
+  fixed-noise loss, and a guidance sweep for brightness and contrast.
