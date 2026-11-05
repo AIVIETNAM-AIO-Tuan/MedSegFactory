@@ -238,3 +238,9 @@ Update: Stage 5 outputs on Colab now go to `MyDrive/EXP-2026-001_stage5/<RUN_TAG
 Colab account's own Drive. That account reaches the data through a shortcut to a folder it
 does not own. r1 lost its folder there, and the cause is still not verified. The next step
 is unchanged: run part 1 and then part 2 with `RUN_TAG = "r2"`.
+
+Update: Stage 5 outputs now go through the Drive API to
+`RHUH-GBM/synthesis/EXP-2026-001/stage5_runs/<RUN_TAG>/`, by folder ID and confirmed by
+server MD5 (`rhuh_synthesis/drive_api.py`). Tests use a fake Drive server. The real API
+path first runs in the preflight at the start of part 1, before any GPU time. Next step
+unchanged: run part 1 and then part 2 with `RUN_TAG = "r2"`.

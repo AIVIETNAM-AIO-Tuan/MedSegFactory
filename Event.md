@@ -773,3 +773,24 @@ Drive and an empty lost-and-found folder.
   separate attempts is not known.
 - The changes in commit a3b6c14 cover this case: nothing in a run depends on the Drive path
   until the copy, and the last cell re-copies whatever is missing from the run folder.
+
+## 2026-11-05 — Stage 5 outputs go through the Drive API (user decision)
+
+- The user supplied the Drive write block from their other project and asked to use the
+  same method. Its notes record the same failure on the same kind of setup: `makedirs`
+  through the mount left same-named folders, which then caused FileNotFoundError. This
+  supports the r1 explanation, but it does not prove it for r1.
+- New module `rhuh_synthesis/drive_api.py` follows those rules, adapted for this repository:
+  - local files are the originals;
+  - uploads go to a folder addressed by ID, and the server's MD5 must match;
+  - files are looked up by ID, and folders are created once through the API, never through
+    the mount;
+  - a failed upload never stops a run, and the end of a run needs a full pass that finds
+    every MD5 on the server;
+  - a preflight does a real write, update, read and removal before any GPU time.
+- Outputs go to `RHUH-GBM/synthesis/EXP-2026-001/stage5_runs/<RUN_TAG>/`, so the old
+  `stage5` folders cannot interfere. This replaces the mount-based copy and the
+  account's-own-MyDrive location from the earlier r1 fixes. Frozen settings and scoring
+  are unchanged.
+- A run on commit ff3e060 may have started before this change. It would write to
+  `MyDrive/EXP-2026-001_stage5/r2`, and the user was asked to stop it.
