@@ -12,6 +12,7 @@ replication but never a PROMOTE, and it supports no clinical claim.
 import contextlib
 import json
 import os
+import shutil
 from itertools import combinations
 from pathlib import Path
 
@@ -27,6 +28,51 @@ from .training import build_feature_cache, slice_pools
 from .working_grid import image_back, labels_back
 
 SAMPLERS = ("pair_preop", "pure_noise")
+
+
+def local_copies(paths, folder):
+    """Copy files to a local folder, skipping complete copies; returns ``{key: local path}``.
+
+    After this, reading the data no longer depends on the Drive connection.
+    """
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    copies = {}
+    for key, source in paths.items():
+        source = Path(source)
+        copy = folder / source.name
+        if not copy.exists() or copy.stat().st_size != source.stat().st_size:
+            partial = copy.with_name(copy.name + ".partial")
+            shutil.copyfile(source, partial)
+            os.replace(partial, copy)
+        copies[key] = copy
+    return copies
+
+
+def mirror(source, target):
+    """Copy files from ``source`` to ``target`` that are missing there or differ in size.
+
+    Never deletes, and never raises on an I/O failure, so a lost Drive connection
+    cannot stop a run: the failure comes back as ``error`` and a later call
+    continues. A file appears under its final name only once complete. Returns
+    ``{"copied", "kept", "error"}``.
+    """
+    source, target = Path(source), Path(target)
+    copied, kept = 0, 0
+    try:
+        for path in sorted(p for p in source.rglob("*") if p.is_file() and not p.name.endswith(".partial")):
+            destination = target / path.relative_to(source)
+            if destination.exists() and destination.stat().st_size == path.stat().st_size:
+                kept += 1
+                continue
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            partial = destination.with_name(destination.name + ".partial")
+            shutil.copyfile(path, partial)
+            os.replace(partial, destination)
+            copied += 1
+    except OSError as error:
+        return {"copied": copied, "kept": kept, "error": str(error)}
+    return {"copied": copied, "kept": kept, "error": None}
 
 
 def accepted_patients(patients, export_dir):

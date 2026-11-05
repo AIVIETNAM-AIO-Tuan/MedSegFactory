@@ -729,3 +729,20 @@ git ls-files found no tracked files under that directory. No files were deleted.
     generation from the previous slice, and zero-initialized through-plane attention.
     Stage 5's through-plane and 3D component numbers give the first evidence of
     whether this is needed.
+
+## 2026-11-05 — Stage 5 r1 stopped; run outputs now go to local disk first
+
+- Part 1 run r1 stopped during training with FileNotFoundError on `train_log.jsonl`.
+  Step 0 previews had already saved through the same path. The failing step and the
+  cause are not verified; a dropped Drive connection is the most likely explanation.
+- Design error: the training loop wrote to Drive at every step, against the plan's
+  rule that local disk serves the training loop.
+- Change, with no effect on frozen settings or scoring: both notebooks copy the exports
+  to local disk, write all outputs there, and copy them to Drive after each preview or
+  stack and at the end. A Drive failure no longer stops a run.
+- r1 stays as a failed attempt. The next run tag is r2.
+- r1 step 0 (MSF checkpoint, zero adapter, pre-op-pair start): image MAE 0.31 against
+  copy 0.097 on the training previews, and 0.30 against 0.082 on the validation previews.
+  So the start alone does not beat the copy. r2 measures this again.
+- User decision: no CPU simulation of GPU runs. The changed notebook lines have unit
+  tests and a static check, but were not executed before hand-over.

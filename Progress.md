@@ -224,3 +224,12 @@ record, no patient IDs in the shareable block). With a stand-in stack of 60% tar
 which checks the mapping back to the 1 mm frame on real validation data. This run used
 the reading code from before the matched-copy check was added; that check has unit
 tests and was re-run on this smoke record.
+
+## 2026-11-05 — Stage 5 r1 stopped by a Drive write; fixed for r2
+
+r1 stopped during training when the step log could not be written to Drive (cause not
+verified). No trained result exists. Both notebooks now write to local disk first and
+copy to Drive, so a Drive failure does not stop a run. Unit tests and a static check
+pass; the changed notebook lines have not been executed.
+
+Next smallest step: run part 1 with `RUN_TAG = "r2"`, then part 2 with the same tag.
