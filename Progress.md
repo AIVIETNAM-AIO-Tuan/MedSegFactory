@@ -305,3 +305,16 @@ Next smallest steps:
 1. Run `notebooks/RHUH_GBM_Colab_msf_diagnostics.ipynb` on Colab (estimate 30 to 60 minutes).
 2. Read the replay first. If it does not reproduce, resolve that before any model reading.
 3. Apply the frozen decision row, then choose one next change with its own preregistration.
+
+
+## 2026-11-06 - EXP-2026-003 diagnostic_r1 analysed
+
+Valid run: the replay reproduced r2 exactly. Frozen reading: D1 present, D2 mixed or missing, so the
+table reports heterogeneity and forces no branch. The pre-op channels are used, and about as much as
+the noised start, but together they set little patient anatomy: medium-scale correlation with the real
+post-op is 0.27, against 0.67 for the pre-op copy and 0.17 for another patient's real scan. In stable
+tissue two draws differ as much as either differs from the target. Details and corrections are in Event.md.
+
+Next smallest steps:
+1. User decision: a card for a localized editor on the r2 weights (sampling only), compared with no-op
+   and deterministic edits. Stage 5 part 2 stays pending.

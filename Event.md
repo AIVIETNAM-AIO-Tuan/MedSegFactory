@@ -916,3 +916,69 @@ comments: the 1.05, 0.10, 10% and 0.03 limits are not used.
 - Real local exports, no model: all 30 donors matched at the same level, the rebuilt parent
   inputs are identical, and the saved previews rescore to 0.140221 and 0.081821 within 3e-8.
 - No GPU run. No diagnostic result, runtime or memory measurement exists yet.
+
+
+## 2026-11-06 - EXP-2026-003 diagnostic_r1 result
+
+Colab run of commit 4c16c0a on the frozen r2 weights: zero training, 39 minutes, peak 31.7 GiB,
+4320 D1 rows, 126 D2 pairs, 426 files confirmed by server MD5. 12 validation preview slices and 2
+oracle CE sentinels from 3 patients, one sampling draw per case, oracle class text. No clinical review.
+
+Frozen reading:
+- Replay `reproduced`: fixed-noise loss relative difference 0.0 at every stream and timestep for both
+  models, generation replay mean absolute difference 3.6e-6 with identical masks, saved previews
+  rescored within 3e-8. Original-model invariance 0.0, `own_repeat` difference 0.0.
+- D1 `present`, D2 `mixed_or_missing`, decision row `mixed_or_missing`: "Report patient/ROI
+  heterogeneity and unavailable endpoints; no forced branch". This is not a quality pass.
+- Guidance `no_consistent_bias_reduction` at CFG 1 and CFG 3.
+
+Reported heterogeneity (image stream, shuffled/own error unless stated):
+- ROI: brain and stable helpful in 12/12 mid and high patient-timesteps, brain 1.03 at t500 and
+  1.14-1.45 at t981. Edit zone 4 helpful, 5 harmful, 3 indeterminate, with V1 and V2 at or below 1.
+- Stream: mask stream 4 helpful, 5 harmful, 3 indeterminate. The image-stream effect comes from the
+  image channels; shuffling the mask channel alone gives 0.99-1.02.
+- Patient: D2 own against donor channels, MAE gain and SSIM gain: V1 +0.006, +0.021; V2 -0.010,
+  +0.002; V3 +0.038, +0.078. V3's 1.45 at t981 is inflated by one skull-base slice (2.24; others
+  1.11-1.26), where the same-z donor anatomy visibly differs.
+- Unavailable: the 12 previews hold no post-op ID 3, so CE rests on 2 sentinel slices of V3. V2 has
+  no ID 2 target on these slices. Text conditioning was not tested.
+
+Post hoc analysis, not preregistered; scripts and logs are in the private folder
+`EXP-2026-003/analysis_diagnostic_r1`:
+- Input following, medium-scale correlation (2-8 mm) with own and with donor pre-op: own start and
+  channels 0.30, 0.16; own start, donor channels 0.23, 0.26; donor start, own channels 0.22, 0.26;
+  donor both 0.12, 0.37. Swapping either input moves own-minus-donor by 0.17-0.21 on average, in the
+  same direction in all 3 patients, so channels and start contribute about equally.
+- Against the real post-op, medium and fine: VAE round trip 0.999, 0.976 (11 slices); pre-op copy
+  0.67, 0.51; generated at CFG 7.5 0.27, 0.08; another patient's real pre-op at the same level 0.17, 0.00.
+- Noise: in the stable ROI two draws differ by MAE 0.135, each draw is 0.13 from the target, and the
+  real pre-to-post change is 0.061. A second draw moves patient-level MAE by 0.005-0.016, so only
+  V3's D2 contrast clearly exceeds it.
+- Memory on unseen patients: the nearest training slice repeats across two draws on 2 of 12 cases, and
+  generated slices are no closer to training (MSE 0.0176) than real unseen scans are (0.0148).
+- Surgery: inside the pre-op tumor core the mean relative to the brain is +0.32 pre-op, -0.20 real
+  post-op and about 0 in every arm, donor arms included. A dark cavity-like region forms on 2 of 6
+  slices. The tumor is not reproduced, but no specific resection is shown.
+- Masks: Dice 0.57 with own pre-op and 0.06 with donor. Against the real target V1 0.23, V2 0, V3
+  0.49, equal to copying the pre-op labels (0.27, 0, 0.48). No false labels on label-free slices with
+  any pair start. False ID 2 on V2's tumor slices under the empty prompt: 947 and 545 mm2 here, 0 in
+  the parent draw. Mask-channel usefulness tracks pre-to-post label similarity (Spearman 0.93, 7 patients).
+- Guidance: CFG 3 improves SSIM and MAE on 12/12 and brings detail energy from 1.17 to 0.97. After an
+  oracle linear intensity fit, brain MAE barely moves (0.079 to 0.077, 0.102 to 0.100, 0.080 to 0.078)
+  and own-minus-donor only moves from 0.14 to 0.15, so this is mostly appearance. On the 2 CE slices,
+  ID 3 falls from 20 and 7 mm2 to 5 and 1 (real 43 and 44).
+- Metric warning: after that same fit all arms score nearly alike, pure noise included (V1 0.083 against
+  0.079). Brain MAE mainly measures brightness and contrast, not anatomy.
+
+Corrections to the Stage 5 r2 review of 2026-11-05:
+- "The model barely uses the clean pre-op input" is not supported.
+- "Darker by 0.065" depends on the draw (-0.038 here); only V3 is consistently dark.
+- "V2's tumor slices are empty because of the oracle prompt" is wrong; see the false labels above.
+- Coarse correlation +0.77 does not show patient-specific shape. The foreground outline does follow the
+  inputs modestly (Dice 0.946 with own pre-op, 0.895 with donor).
+- "Anatomy comes from memory" applies to the training slices, not to unseen patients.
+
+Proposed, not decided: keep Stage 5 part 2 pending, since on these slices the added stable MAE is
++0.064 to +0.069 against the 0.005 limit. The roadmap's condition for an added-channel learning rate
+(weak sensitivity and absent usefulness) is not met. Next would be roadmap item 2, a localized editor
+on the r2 weights with no training, compared with no-op and deterministic edits, under a new card.
