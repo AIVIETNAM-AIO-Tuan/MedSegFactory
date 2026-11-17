@@ -280,3 +280,20 @@ the pipeline, a read-only listing checks what is actually there against the publ
   and pyflakes are not installed.
 - Next: the researcher runs the notebook and sends back the printed summary. The LUMIERE data card follows from the
   real counts. The Phase 2 plan is still a draft with decisions pending.
+
+## 2026-11-17 - LUMIERE inventory result
+
+The researcher ran `notebooks/LUMIERE_Colab_inventory.ipynb` (commit 77824f1) on `MyDrive/LUMIERE`. The listing took
+159 s. Only counts were returned; the full listing stayed on the Colab runtime.
+
+- The public tables on Drive match v202211. 91 patient folders: 85 under `MRI_data_and_auto_segmentation/Imaging` and
+  6 only under `re-mask images`, with no duplicates. 639 study folders, 24,611 files, 31.48 GiB, no zip, no empty file.
+- 2,487 image files (CT1 632, T1 617, T2 626, FLAIR 612), the number the dataset paper reports. DeepBraTumIA and
+  HD-GLIO-AUTO outputs are present in 599 studies, also as reported.
+- Every release pair is on Drive. Same week: 44 patients, 44 T1ce pairs, 36 with all four sequences and DeepBraTumIA
+  outputs on both sides. Next week: 23, 23 and 21. Two or more weeks: 24, 20 and 14.
+- Open: 630 of 638 release studies match a folder by name, and 9 folders are not in the release (one with an
+  unexpected name); the pair counts are unaffected. There are about 560 more files than the readme layout predicts
+  (2,487 + 599 x 36 = 24,051), not yet identified. Whether any mask under `re-mask images` was edited is unknown.
+- Next: a read-only follow-up cell identifies these and matches DeepBraTumIA label IDs to tissue names through
+  DeepBraTumIA's own volume file.
