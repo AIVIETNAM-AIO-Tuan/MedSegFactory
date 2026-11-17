@@ -258,3 +258,25 @@ Next smallest steps:
    training on the r2 weights (own against wrong pre-op channels, guidance sweep).
 2. If the pre-op channels turn out to be ignored, test a higher learning rate for those
    channels only, as one declared change.
+
+## 2026-11-17 - LUMIERE read-only inventory (Phase 2, step A1)
+
+The researcher reported that the full LUMIERE release is on Drive at `MyDrive/LUMIERE`. Before any LUMIERE data enter
+the pipeline, a read-only listing checks what is actually there against the public v202211 tables.
+
+- Added `rhuh_synthesis/lumiere.py`, `scripts/audit_lumiere.py` and `notebooks/LUMIERE_Colab_inventory.ipynb` on
+  branch `lumiere-onboarding`. The tool lists folders and file sizes only, never opens images, never writes to the
+  dataset folder, and prints counts without patient or study names. It uses the public tables only when their SHA-256
+  matches v202211.
+- Pairing rule: per patient, the first Post-Op study and the latest Pre-Op study before it; tiers by week gap (same
+  week, next week, two or more weeks).
+- Found in the public tables: three rated study names (`week-000`) do not exist in the release, which names those
+  studies `week-000-1` and `week-000-2`. The tool maps a missing rated name onto the patient's only unrated release
+  study in that week and reports the count. With the mapping, the same-week tier has 44 patients and 44 T1ce pairs, 36
+  of them with all four sequences and DeepBraTumIA outputs on both sides. The 41 T1ce pairs quoted on 2026-11-16 missed
+  these three.
+- Tests, local only: `python -m pytest -q tests/test_lumiere_inventory.py`, 9 passed. A fake tree built from the
+  public completeness table reproduces the release counts, and the scan leaves the tree unchanged. Lint not run: ruff
+  and pyflakes are not installed.
+- Next: the researcher runs the notebook and sends back the printed summary. The LUMIERE data card follows from the
+  real counts. The Phase 2 plan is still a draft with decisions pending.
