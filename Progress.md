@@ -297,3 +297,23 @@ The researcher ran `notebooks/LUMIERE_Colab_inventory.ipynb` (commit 77824f1) on
   (2,487 + 599 x 36 = 24,051), not yet identified. Whether any mask under `re-mask images` was edited is unknown.
 - Next: a read-only follow-up cell identifies these and matches DeepBraTumIA label IDs to tissue names through
   DeepBraTumIA's own volume file.
+
+## 2026-11-17 - LUMIERE follow-up checks and old notebooks
+
+The researcher pointed to `notebooks/old_notes/` (the August to October download, preparation and QC notebooks) and
+ran a read-only follow-up cell. Findings from the saved outputs and the cell, counts only:
+
+- DeepBraTumIA label IDs: 1 enhancing, 2 necrotic or non-enhancing (it also covers the cavity after surgery), 3 edema.
+  The old QC notebook matched them to DeepBraTumIA's own volume files in 526 of 526 fully labelled studies, and its
+  image checks agree. LUMIERE's DeepBraTumIA radiomics table names labels 1 and 2 the other way round.
+- The 8 release studies missing by folder name belong to one patient whose folders in the release zip are named about
+  6 weeks earlier than in the completeness table; the rating table names its post-op scan a third way. The zip MD5
+  matched Figshare, so the inconsistency is in the release. That patient's pair is excluded.
+- The extra folder and the 560 extra files are a nested duplicate of one `re-mask images` patient (14 studies of 40
+  files) inside a patient folder. Every release study also exists at its normal place.
+- DeepBraTumIA's native-to-atlas transforms are linear (a composite holding one matrix-plus-offset transform) in 60 of
+  60 sampled studies, so the atlas copies are not deformably warped.
+- DeepBraTumIA's post-op labels are not usable as targets: after the old notebook's blood-removal rule, 14 of 79
+  complete-resection studies keep more than 1 ml of enhancing label, and 9 of 36 partial-resection studies keep 0.175
+  ml or less. Native scans vary in slice thickness; the atlas copies are uniform 1 mm.
+- Next: the LUMIERE data card.
