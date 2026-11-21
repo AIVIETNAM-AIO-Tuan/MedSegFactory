@@ -434,3 +434,17 @@ sampler work (plan packages C and D) as well.
   passed. Lint not run: ruff and pyflakes are not installed.
 - Next: the researcher confirms the HD-GLIO-AUTO reading and runs the notebook on Colab (CPU). Claude writes the
   card for the scaffold and sampler work and shows it before any code.
+
+## 2026-11-21 - EXP-2026-008 drafted (scaffold, residual rule, localized sampler)
+
+Card `experiments/registry/EXP-2026-008.md` covers plan packages C and D, now Claude's. Nothing is implemented. It
+reuses the source anchoring and one-patient wiring checks of Codex's EXP-2026-004 and drops its mesh arms.
+
+- Scaffold: the dark fill of the pre-op core measured on 2026-11-17. Recomputed from the saved results: mean paired
+  gain over a copy 0.027 (95% patient bootstrap 0.019 to 0.035), lower in 23 of 24 accepted training patients. The
+  CPU check C4 must reproduce it with the new code.
+- Residual rule: 1 to 5 pieces of the pre-op enhancing rim, 0.2 to 1.8 ml in total, keeping pre-op intensities.
+- Sampler: per-step source anchoring outside the edit regions, and the fixed-mask option of plan item 9.
+- Wiring test: one RHUH training patient chosen by rule (median core among the accepted development cases), 12
+  slices, 8 arms, seeds 11, 22 and 33, on the r2 weights.
+- Next: the researcher's review of the card; Codex's review requested through the researcher.
