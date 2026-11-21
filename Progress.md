@@ -317,3 +317,48 @@ ran a read-only follow-up cell. Findings from the saved outputs and the cell, co
   complete-resection studies keep more than 1 ml of enhancing label, and 9 of 36 partial-resection studies keep 0.175
   ml or less. Native scans vary in slice thickness; the atlas copies are uniform 1 mm.
 - Next: the LUMIERE data card.
+
+## 2026-11-17 - LUMIERE data card drafted; Phase 2 plan revision 2
+
+The researcher took two decisions on LUMIERE. The next-week and later tiers are not used in this phase. No post-op
+voxel label on LUMIERE becomes a training target until it passes a test against the expert ratings; this covers
+DeepBraTumIA's post-op masks and our own labeller. Pre-op DeepBraTumIA masks are kept, with a cross-check against
+HD-GLIO-AUTO.
+
+- `PHASE2_PLAN.md` is now revision 2 (still a draft): same-week tier only, Package B turned into a labeller test
+  against the expert ratings, run E3 supervising only the image stream on LUMIERE rows unless that test passes.
+- `experiments/registry/EXP-2026-005.md` drafted as the LUMIERE data card. Status DRAFT; nothing in it has run. Its
+  thresholds are proposals listed in a decision table for the researcher.
+- Counts from the public tables, matching the Drive inventory: of the 44 same-week pairs, 36 have a pre-op
+  DeepBraTumIA mask (27 complete and 9 partial resections by expert rating). The other 8 lack a pre-op sequence, so
+  neither tool produced a mask; they are not used.
+- Recounted from the RHUH QC tables for the card's reference: the frozen registration rule alone passed 23 of 28
+  training pairs and 3 of 6 validation pairs; the 24th accepted training pair came from the overlay review.
+- Checked in the dataset paper: it says DeepBraTumIA registers to an atlas and does not say whether that registration
+  is rigid. The transform files decide; this is step 3 of the card and is not done.
+- No code was written or run. Tests: none needed.
+- Next: the researcher's answers to the card's decision table. Then the pair files are copied to the laptop and the
+  manifest and geometry check follow.
+
+## 2026-11-21 - LUMIERE data card: the researcher's answers; geometry and sample tool
+
+The researcher went through the card's decision table. Approved: the cohort of 36 same-week pairs and the pre-op mask
+flag rule. Questions on the rest; the card records the state of each decision.
+
+- Where it runs, revised: the full run is on Colab against Drive. Every step is CPU work (the registration is
+  SimpleITK on the CPU), so a GPU runtime is not needed. Four pairs (3 complete and 1 partial resection, seed 2026) go
+  to the laptop so the code is tested on real files first; these four patients are pinned to training.
+- Thick-slice rule, checked against RHUH: in RHUH's DICOM headers (one header per series) the T1ce series are 3D with
+  slices of 2 mm or less in 79 of the 80 pre-op and post-op scans; one post-op scan is a 2D scan at 5 mm. T1ce was
+  told from T1 by the series name in 37 of 40 patients per visit and by being the only 3D T1 series in 3. The 2-mm
+  limit therefore keeps LUMIERE inside RHUH's range. Which role the one 5-mm RHUH scan has was not looked up.
+- Added `rhuh_synthesis/lumiere_pairs.py` and `notebooks/LUMIERE_Colab_pairs_geometry.ipynb` (card steps 1 and 3,
+  read-only): the eligible pairs, the scale of DeepBraTumIA's atlas transforms, native and atlas T1ce header geometry,
+  and a tar file of the four sample pairs. The summary holds counts only. No rule is applied by the tool.
+- Tests, local only: `python -m pytest -q tests/test_lumiere_pairs.py tests/test_lumiere_inventory.py`, 16 passed.
+  A fake tree built from the public completeness table gives 36 eligible pairs (27 complete, 9 partial). Lint not
+  run: ruff and pyflakes are not installed. The tool has not run on the real data.
+- Open: the split (the researcher asked about training on all LUMIERE pairs with RHUH as the only validation), the
+  fallback below the gate (unpaired use of LUMIERE post-op scans), and the post-op mask handling (not answered).
+- Next: the researcher runs the notebook and sends back the geometry summary; the four-pair file goes to
+  `data/LUMIERE/` on the laptop.
