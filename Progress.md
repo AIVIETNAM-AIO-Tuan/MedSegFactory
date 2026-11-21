@@ -362,3 +362,24 @@ flag rule. Questions on the rest; the card records the state of each decision.
   fallback below the gate (unpaired use of LUMIERE post-op scans), and the post-op mask handling (not answered).
 - Next: the researcher runs the notebook and sends back the geometry summary; the four-pair file goes to
   `data/LUMIERE/` on the laptop.
+
+## 2026-11-21 - Phase 2 plan revision 3 approved; nothing is implemented yet
+
+The researcher brought a literature survey and asked whether the current approach is suitable. Its main advice (a
+procedural step sets geometry and labels, a learned model renders appearance, 2D with pretrained parts) is the design
+`PHASE2_PLAN.md` already has. The plan is now revision 3 and approved; the decisions are in Event.md.
+
+- Added to the plan as items 9 to 12: a sampler arm with the mask held fixed to the scenario; labelled pre-op scans
+  as extra training rows (the researcher's choice: RHUH and LUMIERE pre-op scans, not MU); a memorization check; a
+  second real test set of LUMIERE patients kept out of all training.
+- Counted for item 10 on the 24 accepted RHUH training patients: 1,086 of 3,720 slices carry a pre-op enhancing label
+  (24 of 24 patients, 596.5 ml) against 127 post-op (7 of 24 patients, 6.1 ml).
+- Read in the code for item 9: training draws a separate timestep for the image row and the mask row, and the
+  sampler uses one timestep for both, so a fixed-mask arm needs a sampler option and no retraining. How strongly the
+  image follows the mask stream has not been measured.
+- `EXP-2026-005.md` now records the two rules that concern LUMIERE patients: the 55 patients outside the eligible
+  cohort enter no training, and pre-op scans of training-role patients may serve a later card.
+- No code was written and nothing was run. The researcher asked to be asked before implementation starts.
+- Blockers: the geometry notebook has not been run yet, and the four-pair sample file is not on the laptop; who
+  implements packages C and D is not decided.
+- Next: ask the researcher for the start of each package when its inputs are in place.

@@ -849,3 +849,40 @@ numbers are post hoc and descriptive. No clinical claim follows.
   loses nothing. This departs from the notebook's note to run it whatever the previews show.
   Run a short GPU diagnostic without training first: own against wrong pre-op channels by
   fixed-noise loss, and a guidance sweep for brightness and contrast.
+
+## 2026-11-21 - Phase 2 plan approved; LUMIERE decisions; implementation waits for the researcher
+
+Decisions taken by the researcher:
+
+- 2026-11-17: of LUMIERE, only the same-week tier is used. The next-week and later tiers stay out of training.
+- 2026-11-17: no post-op voxel label on LUMIERE is a training target until it passes a test against the expert
+  ratings. This covers DeepBraTumIA's post-op masks and our own labeller. Pre-op DeepBraTumIA masks are kept, with a
+  cross-check against HD-GLIO-AUTO.
+- 2026-11-21: the cohort of EXP-2026-005 is the 36 same-week pairs with a pre-op mask, and a pair is excluded when
+  the two tools' pre-op enhancing labels overlap with Dice below 0.5.
+- 2026-11-21: `PHASE2_PLAN.md` revision 3 is approved as the direction for phase 2, with its items 9 to 12: a
+  sampler arm with the mask held fixed to the scenario; labelled pre-op scans of RHUH and LUMIERE training patients
+  as extra training rows, only if the wiring test shows the failure they address, and not MU scans; a memorization
+  check in every training run; the 55 LUMIERE patients outside the eligible cohort kept out of all training as a
+  second real test for phase 3.
+- 2026-11-21: no implementation starts until the researcher has been asked and has agreed.
+
+How the approval is read (Claude's interpretation, to be corrected by the researcher if wrong): it covers the
+direction and items 9 to 12. It does not settle who implements packages C and D, whether Stage 5 part 2 runs now,
+whether LUMIERE keeps a development set, the still-open decisions of EXP-2026-005 (where it runs, the route rule, the
+thick-slice rule, the fallback below the gate, the post-op mask handling) or any gate threshold. Each is confirmed
+when its package's start is requested.
+
+Basis and limits:
+
+- The plan rests on the exploratory results in its section 2: accepted RHUH training patients only, CPU, no
+  clinician. Scripts and outputs are under `data/RHUH-GBM/synthesis/analysis_exp004_review_2026-11-10/`
+  (git-ignored).
+- Revision 3 follows a literature survey the researcher obtained on 2026-11-21 (not in the repo). Its claims are not
+  re-verified, except that the MICCAI page of Kang et al. 2025 was read: 2D, pre-op image and mask in, post-op image
+  out, no labels, no segmentation test. Two papers close to this project's gap were read by neither the survey nor
+  us, so "no direct prior work" is plausible and not confirmed.
+- The survey assumed 36 patients with real cavity masks. The 36 LUMIERE pairs have only unverified automated
+  post-op masks; RHUH has expert residual-tumor labels and no cavity label; expert cavity labels exist in MU.
+- Nothing was run for these decisions except one count: on the 24 accepted RHUH training patients, 1,086 of 3,720
+  slices carry a pre-op enhancing label against 127 post-op. No clinical claim is made.
