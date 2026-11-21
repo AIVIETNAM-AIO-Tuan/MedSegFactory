@@ -383,3 +383,24 @@ procedural step sets geometry and labels, a learned model renders appearance, 2D
 - Blockers: the geometry notebook has not been run yet, and the four-pair sample file is not on the laptop; who
   implements packages C and D is not decided.
 - Next: ask the researcher for the start of each package when its inputs are in place.
+
+## 2026-11-21 - LUMIERE geometry result: atlas copies are rigid; 33 pairs remain
+
+The researcher ran `notebooks/LUMIERE_Colab_pairs_geometry.ipynb` (commit 35d9ec4) on Colab and put the 4-pair sample
+on the laptop. Only counts came back from Colab. Details are in `experiments/registry/EXP-2026-005.md`, step 3.
+
+- All 72 studies of the 36 eligible pairs were read; none failed. Every DeepBraTumIA `ct1.tfm` holds one linear
+  transform with all singular values equal to 1 (five decimals). By the card's route rule the atlas copies are used:
+  182 x 218 x 182 at 1 mm, one grid for all 72 studies.
+- Checked a second way on the 4 sample pairs (8 studies): DeepBraTumIA's mask moved to atlas space with the inverse
+  of the stored transform matches its atlas mask with Dice 0.993 to 0.999, and label volumes agree within 0.03 ml
+  (without the transform, 0.00 to 0.78). So the atlas copies are rigid resamplings and keep mm and ml.
+- Native T1ce: 68 studies have no voxel side above 1.05 mm, 4 studies in 3 pairs have a side above 2 mm, none in
+  between. The thick-slice rule excludes those 3 pairs: 33 remain. Their split by expert rating was not printed.
+- Seen on the sample, not yet a rule: brain volume differs between atlas copies and released native scans by -2% to
+  +10% (DeepBraTumIA's skull stripping against HD-BET's). HD-GLIO-AUTO's native masks lie on the native T1ce grid;
+  DeepBraTumIA's native masks cover the same box with the axes stored in another order in 6 of 8 studies. The card's
+  step 4 now compares the two tools' masks in atlas space.
+- The sample file's SHA-256 matches the one printed on Colab. Size of the files of all 36 pairs: 1.63 GiB.
+- Next: the researcher confirms the two outcomes (atlas copies; 33 pairs) and decides on the LUMIERE development set
+  and on starting Package A steps 2 and 4 to 7.
