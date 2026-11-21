@@ -144,7 +144,7 @@ clinician is available. So it must pass a test that it can fail before any of it
 - The cavity class has no check on LUMIERE at all: the expert ratings concern enhancing tumor. It stays out of every
   target, as in RHUH's convention.
 
-### Package C — Scaffold v3 and scenarios (EXP-2026-004 revision 3, or a new card)
+### Package C — Scaffold v3 and scenarios (card EXP-2026-008, Claude; Codex reviews)
 
 | Step | Work |
 |---|---|
@@ -158,7 +158,7 @@ clinician is available. So it must pass a test that it can fail before any of it
   exactness, output geometry.
 - Gate C: all tests pass and the scaffold reproduces the measured gain over a copy on RHUH training patients.
 
-### Package D — Localized sampler and wiring test (EXP-2026-004 revision 3)
+### Package D — Localized sampler and wiring test (card EXP-2026-008, with Package C)
 
 | Step | Work |
 |---|---|
@@ -227,8 +227,9 @@ Then: B3-B5 after A2; C4 after C1-C3 and A7; D2 after C and D1 (GPU); E1-E2 afte
 ## 6. Roles
 
 - Researcher: decisions in section 8, Colab runs, overlay looks.
-- Claude: cards and code for A, B, E; CPU analyses; run analysis. Reviews Codex's card when asked.
-- Codex: EXP-2026-004 revision 3 (C and D), unless reassigned.
+- Claude: cards and code for A, B, C, D and E (C and D reassigned by the researcher on 2026-11-21); CPU analyses;
+  run analysis.
+- Codex: reviews EXP-2026-008 (packages C and D) when asked.
 
 ## 7. Risks
 
@@ -248,10 +249,10 @@ Then: B3-B5 after A2; C4 after C1-C3 and A7; D2 after C and D1 (GPU); E1-E2 afte
 
 | # | Decision | Recommendation | State |
 |---|---|---|---|
-| 1 | Who revises EXP-2026-004, and whether the mesh, ellipsoid, donor and contraction arms are dropped | Codex revises; drop those arms, keep the localized-editing arms | open |
+| 1 | Who revises EXP-2026-004, and whether the mesh, ellipsoid, donor and contraction arms are dropped | Codex revises; drop those arms, keep the localized-editing arms | decided 2026-11-21: Claude takes C and D in a new card (EXP-2026-008) with Codex reviewing; those arms are outside the approved phase 2 scope |
 | 2 | Run Stage 5 part 2 now | Yes | open |
 | 3 | LUMIERE tiers | Same-week only | decided 2026-11-17: next-week and later tiers are not used |
-| 4 | Hold out 20% of eligible same-week LUMIERE patients as a development set | Yes | open; proposed in EXP-2026-005 |
+| 4 | Hold out 20% of eligible same-week LUMIERE patients as a development set | Yes | approved 2026-11-21 |
 | 5 | LUMIERE masks | Pre-op: DeepBraTumIA with a cross-check. Post-op: no voxel label as a target until Gate B passes | decided 2026-11-17 |
 | 6 | Add a cavity class to the mask now | No; keep RHUH's convention this phase | open |
 | 7 | Bundle the two E1 edits | Yes | open |

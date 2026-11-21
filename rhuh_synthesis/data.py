@@ -39,10 +39,33 @@ from .registration import (
 LABEL_IDS = (1, 2, 3)
 
 
+def remap_labels(labels, id_map):
+    """Renumber label IDs with ``id_map`` ({source ID: target ID}; keys may be strings). 0 stays 0.
+
+    Every nonzero ID in ``labels`` must be a key of the map, so an unexpected ID stops the export.
+    """
+    labels = np.asarray(labels)
+    mapping = {int(source): int(target) for source, target in id_map.items()}
+    present = {int(value) for value in np.unique(labels)} - {0}
+    unknown = sorted(present - set(mapping))
+    if unknown:
+        raise ValueError(f"Label IDs {unknown} are not in the ID map {mapping}")
+    out = np.zeros_like(labels)
+    for source, target in mapping.items():
+        out[labels == source] = target
+    return out
+
+
 def load_visit(record, repo_root):
-    """Load one visit; the recorded background must match the source border again."""
+    """Load one visit; the recorded background must match the source border again.
+
+    A label record may carry ``id_map`` (another dataset's IDs -> this project's IDs); the IDs are renumbered in
+    memory before any use. RHUH manifests have no ``id_map`` and load unchanged.
+    """
     image, affine = load_xyz(Path(repo_root) / record["t1ce"]["path"])
     labels, label_affine = load_xyz(Path(repo_root) / record["label"]["path"], labels=True)
+    if record["label"].get("id_map"):
+        labels = remap_labels(labels, record["label"]["id_map"])
     if image.shape != labels.shape or not np.allclose(affine, label_affine, atol=1e-4):
         raise ValueError(f"{record['t1ce']['path']}: image/label grid mismatch")
     background = border_background(image)

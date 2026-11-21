@@ -886,3 +886,36 @@ Basis and limits:
   post-op masks; RHUH has expert residual-tumor labels and no cavity label; expert cavity labels exist in MU.
 - Nothing was run for these decisions except one count: on the 24 accepted RHUH training patients, 1,086 of 3,720
   slices carry a pre-op enhancing label against 127 post-op. No clinical claim is made.
+
+## 2026-11-21 - LUMIERE step decisions; HD-GLIO-AUTO files read flipped; scaffold and sampler move to Claude
+
+Decisions taken by the researcher on 2026-11-21:
+
+- EXP-2026-005 outcomes confirmed: the atlas copies are used, and the thick-slice rule leaves 33 of the 36 pairs.
+- A LUMIERE development set of about 20% of the eligible patients is kept, by patient and stratified by expert
+  rating.
+- The rest of the LUMIERE step (manifest, mask check, split, registration, export) may be implemented.
+- Claude takes plan packages C and D (scaffold v3, rule-based residual, localized sampler with the fixed-mask arm),
+  with Codex as reviewer. They get a new card, shown to the researcher before any code. The mesh, ellipsoid, donor
+  and contraction arms of EXP-2026-004 are outside the approved phase 2 scope.
+
+Found during implementation, with a change to EXP-2026-005 step 4 that awaits the researcher's confirmation:
+
+- In all 8 studies of the 4-pair sample, HD-GLIO-AUTO's released native masks lie off the tumor as stored. Flipping
+  their voxel array along index axes 0 and 2, with the header unchanged, puts them on the tumor. Checked two ways:
+  - Against DeepBraTumIA: whole-lesion Dice 0.54 to 0.90 flipped, 0.00 as stored.
+  - Against the native T1ce alone: robust z of T1ce in the brightest HD-GLIO-AUTO label is 0.98 to 2.50 flipped,
+    against -0.30 to 0.50 as stored.
+- Mirroring through the world origin does not fit. Why the files are stored this way is not known, and it is not
+  known whether every study in the release behaves the same.
+- The mask check therefore chooses one reading for all studies, by native T1ce evidence alone, and stops unless one
+  reading gets at least 90% of the pre-op votes. This keeps the approved cross-check usable without per-case repair.
+
+Other choices recorded with the implementation:
+
+- Foreground of a LUMIERE export: DeepBraTumIA's skull stripping, as carried by the atlas copies. On the 4 sample
+  pairs it changed by at most 3% from pre-op to post-op, against up to 9% for the released HD-BET masks.
+- `data.load_visit` renumbers label IDs when a manifest label record carries `id_map`. RHUH manifests carry none, so
+  RHUH loads are unchanged.
+
+All numbers come from 4 patients on the laptop and are exploratory. The full run on Colab gives the cohort numbers.

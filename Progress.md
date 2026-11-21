@@ -404,3 +404,33 @@ on the laptop. Only counts came back from Colab. Details are in `experiments/reg
 - The sample file's SHA-256 matches the one printed on Colab. Size of the files of all 36 pairs: 1.63 GiB.
 - Next: the researcher confirms the two outcomes (atlas copies; 33 pairs) and decides on the LUMIERE development set
   and on starting Package A steps 2 and 4 to 7.
+
+## 2026-11-21 - LUMIERE export implemented and tested on the 4-pair sample
+
+The researcher confirmed the geometry outcomes (atlas copies; 33 pairs after the thick-slice rule), kept the LUMIERE
+development set, approved the start of the rest of the LUMIERE step, and asked Claude to take the scaffold and
+sampler work (plan packages C and D) as well.
+
+- Added `rhuh_synthesis/lumiere_export.py`, `configs/experiments/EXP-2026-005.json` and
+  `notebooks/LUMIERE_Colab_export.ipynb`: manifest, mask check, split, registration control and export for the
+  eligible pairs, reusing the frozen EXP-2026-001 registration, frame and acceptance rule v1 unchanged. Exports hold
+  `post_label_unverified` in place of `label`. Records go to `MyDrive/LUMIERE_derived/EXP-2026-005/<run>` through the
+  Drive API.
+- One shared change: `data.load_visit` renumbers label IDs when a manifest label record carries `id_map`. RHUH
+  manifests have none; the RHUH registration, manifest, split, policy, geometry and Drive tests all pass after it.
+- Found while running the code on the real sample: HD-GLIO-AUTO's released native masks are stored flipped along two
+  array axes relative to their headers in all 8 sample studies (Dice 0.00 with DeepBraTumIA as stored, 0.54 to 0.90
+  flipped). The native T1ce alone confirms the flipped reading: T1ce robust z in its brightest label is 0.98 to 2.50
+  flipped against -0.30 to 0.50 as stored. The mask check now chooses one reading for all studies from that image
+  evidence and stops below 90% agreement. This is a change to the card's step 4, pending the researcher's
+  confirmation.
+- Development run on the 4 sample pairs (laptop CPU, 155 s, not a record): pre-op enhancing Dice between the tools
+  0.66 to 0.87, none flagged; both shuffle controls rejected every shuffled pair; all 4 real pairs accepted by rule
+  v1 (far correlation 0.18 to 0.30 before and 0.61 to 0.84 after registration, outline Dice 0.957 to 0.966).
+- Chosen as announced: the foreground of a LUMIERE export is DeepBraTumIA's skull stripping, carried by the atlas
+  copies. On the 4 sample pairs its brain volume changed by at most 3% from pre-op to post-op, against up to 9% for
+  the released HD-BET masks.
+- Tests, local only: `python -m pytest -q tests/test_lumiere_export.py tests/test_lumiere_export_drive.py`, 11
+  passed. Lint not run: ruff and pyflakes are not installed.
+- Next: the researcher confirms the HD-GLIO-AUTO reading and runs the notebook on Colab (CPU). Claude writes the
+  card for the scaffold and sampler work and shows it before any code.
