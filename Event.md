@@ -919,3 +919,16 @@ Other choices recorded with the implementation:
   RHUH loads are unchanged.
 
 All numbers come from 4 patients on the laptop and are exploratory. The full run on Colab gives the cohort numbers.
+
+## 2026-11-21 - EXP-2026-005 decision 9 confirmed: the HD-GLIO-AUTO cross-check stays
+
+The researcher chose to keep the cross-check of DeepBraTumIA's pre-op masks against HD-GLIO-AUTO, with the rule of
+step 4: one reading of HD-GLIO-AUTO's files for all studies, chosen by native T1ce evidence, and a stop when no
+reading gets 90% of the pre-op votes.
+
+- Alternatives laid out and not used:
+  - An image-only check of DeepBraTumIA's enhancing label. It misses a label placed on another bright structure or
+    on part of the tumor.
+  - No check.
+- HD-GLIO-AUTO stays a referee only: none of its labels enters an export.
+- Next: the full run of the export notebook on Colab (run tag r1).

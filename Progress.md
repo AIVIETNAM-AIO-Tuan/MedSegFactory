@@ -448,3 +448,17 @@ reuses the source anchoring and one-patient wiring checks of Codex's EXP-2026-00
 - Wiring test: one RHUH training patient chosen by rule (median core among the accepted development cases), 12
   slices, 8 arms, seeds 11, 22 and 33, on the r2 weights.
 - Next: the researcher's review of the card; Codex's review requested through the researcher.
+
+## 2026-11-21 - EXP-2026-005 ready for the full run
+
+Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was confirmed today.
+
+- Next: the researcher runs `notebooks/LUMIERE_Colab_export.ipynb` on a Colab CPU runtime with run tag r1 and sends
+  the SUMMARY block.
+- Stops built into the run:
+  - It halts with an error, which shows vote counts only, if no HD-GLIO-AUTO reading or enhancing label ID gets 90%
+    of the pre-op votes.
+  - It stops on purpose, with a summary, if the shuffled mask control or the registration control fails.
+- Gate A (24 accepted pairs) is reported in the summary.
+- Not known before the run: the native T1ce orientations of the cohort. The geometry run counted only the atlas
+  grids, and the 4 sample patients were all PIR. The vote shows whether other orientations behave like the sample.
