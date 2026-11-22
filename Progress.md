@@ -472,3 +472,12 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - Next, for the researcher to choose:
   - a read-only diagnostic of the 5 exclusions;
   - approval of EXP-2026-008 (scaffold and sampler).
+
+## 2026-11-22 - Read-only check of run r1's exclusions ready; EXP-2026-008 implementation starts
+
+- `notebooks/LUMIERE_Colab_reading_check.ipynb` is ready for the researcher (Colab CPU, read-only, counts only).
+- Local tests: `python -m pytest -q tests/test_lumiere_reading_check.py`, 6 passed. These include a synthetic patient
+  whose files are stored unflipped: the check recovers it and still excludes the genuinely disagreeing one.
+- On the laptop's 4-pair dev run the check reproduced that run's Dice exactly: all PIR, flips identical, Dice 0.0
+  when read as stored.
+- Next: the researcher runs the check and sends the DIAGNOSTIC block. Claude starts EXP-2026-008 with C1 to C4.

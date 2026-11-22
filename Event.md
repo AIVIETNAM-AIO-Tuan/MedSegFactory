@@ -959,3 +959,15 @@ Found:
 Proposed to the researcher, not started: a read-only count of what the 5 exclusions are, by reading and by native
 orientation. After it, either keep r1 or make a new run with a revised reading rule, recorded as a deviation found
 after r1.
+
+## 2026-11-22 - Read-only check of the r1 exclusions approved; EXP-2026-008 approved
+
+The researcher answered "okay" to the two proposals put after run r1:
+
+- A read-only check of what the 5 mask exclusions of run r1 are.
+  - `rhuh_synthesis/lumiere_reading_check.py` and `notebooks/LUMIERE_Colab_reading_check.ipynb`.
+  - It measures the pre-op enhancing Dice of the two tools under each HD-GLIO-AUTO reading, and native orientations.
+  - It previews a per-study reading chosen by T1ce evidence only. It changes nothing in r1.
+  - A new run with a revised reading rule would need the researcher's approval after this check. It would be
+    recorded as a deviation found after r1.
+- EXP-2026-008 (scaffold, residual rule, localized sampler) approved for implementation.
