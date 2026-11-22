@@ -577,3 +577,9 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   and the decision was ITERATE on the random tiny model. Two deliberate faults were each caught. Wide suite: 378 passed (synthesis, LUMIERE, scaffold, D1, D2, Colab-package and rhuh_qc test files); in the main tree, Codex's sampler-using tests 147 passed.
 - Next: the researcher runs the D2 notebook on a Colab GPU and sends the summary. The LUMIERE part of C4 is the next
   CPU item.
+
+## 2026-11-22 - D2 d2_r1 stopped on a device mismatch; fixed
+
+- Cause and fix as in Event.md. Tests (local only): 59 passed on the D2, localized-sampling and model files; 54 on the
+  generation-path files; 147 on Codex's sampler-using tests.
+- The notebook's default run tag is now d2_r2. Next: the researcher reruns the D2 notebook.

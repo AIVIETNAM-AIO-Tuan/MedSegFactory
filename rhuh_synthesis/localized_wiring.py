@@ -212,7 +212,8 @@ class SlabSampler:
         self.support = {name: latent_support(region) for name, region in regions.items()}
         self.conditions = (self._encode(self.grid["pre_image"], batch), mask_fractions(self.grid["pre_label"]))
         self.sources = {name: self._encode(image, batch) for name, image in self.grid["images"].items()}
-        self.mask_sources = {name: mask_latents(vae, mask, mask_codec=codec, device=device, batch=batch)
+        vae_device = next(vae.parameters()).device  # not the caller's device argument: the VAE's own
+        self.mask_sources = {name: mask_latents(vae, mask, mask_codec=codec, device=vae_device, batch=batch)
                              for name, mask in self.grid["masks"].items()}
         self.prompts = {kind: [scenario_prompts(ids, text_config)["prompts"][0] for ids in by_slice]
                         for kind, by_slice in inputs["scenario_ids"].items()}

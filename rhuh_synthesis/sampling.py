@@ -311,16 +311,19 @@ def decode_pair(vae, image_latents, mask_latents, *, mask_codec="scalar_id_over_
     if mask_codec not in MASK_CODECS:
         raise ValueError(f"Unknown mask codec {mask_codec!r}")
     scale = float(vae.config.scaling_factor)
-    dtype = next(vae.parameters()).dtype
+    reference = next(vae.parameters())
     images = decode_images(vae, image_latents)
-    masks = vae.decode(mask_latents.to(dtype) / scale).sample.float().cpu().numpy()
-    return images, MASK_CODECS[mask_codec][1](masks)
+    masks = vae.decode(mask_latents.to(device=reference.device, dtype=reference.dtype) / scale).sample
+    return images, MASK_CODECS[mask_codec][1](masks.float().cpu().numpy())
 
 
 @torch.no_grad()
 def decode_images(vae, image_latents):
-    """Decode image latents to ``[B, H, W]`` float32 in [0, 1], as ``decode_pair`` does for its images."""
+    """Decode image latents to ``[B, H, W]`` float32 in [0, 1], as ``decode_pair`` does for its images.
+
+    The latents may be on any device: they are moved to the VAE's device and dtype first.
+    """
     scale = float(vae.config.scaling_factor)
-    dtype = next(vae.parameters()).dtype
-    images = vae.decode(image_latents.to(dtype) / scale).sample.float()
+    reference = next(vae.parameters())
+    images = vae.decode(image_latents.to(device=reference.device, dtype=reference.dtype) / scale).sample.float()
     return ((images / 2.0 + 0.5).clamp(0.0, 1.0)).mean(dim=1).cpu().numpy().astype("float32")

@@ -1093,3 +1093,10 @@ after run r1.
   development cases, the median with a 36.6-ml core.
 - Nothing has run on the GPU. The CPU tests check the wiring with tiny random models and say nothing about the r2
   model.
+
+## 2026-11-22 - EXP-2026-008 D2 attempt d2_r1 stopped before sampling: device mismatch, fixed
+
+- On the researcher's Colab G4 the run stopped while building the slab inputs. The scaffold's VAE round trip fed CPU
+  latents to the CUDA VAE: `sampling.decode_images` cast the dtype but not the device. The CPU tests could not see it.
+- Fixed: decoding moves latents to the VAE's device; the D2 sampler takes the VAE's own device for the mask latents. A
+  meta-device test now covers this bug class. No output was written; the next attempt is d2_r2.
