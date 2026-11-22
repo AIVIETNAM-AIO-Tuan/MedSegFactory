@@ -1116,3 +1116,16 @@ after run r1.
   - Anchoring kept raw drift outside E near the VAE's own error (1.04 times, against 3.7 times without anchoring).
   - No arm beat the scaffold on the primary MAE.
 - Next: rerun as d2_r3.
+
+## 2026-11-23 - EXP-2026-008 D2 run d2_r3: PROMOTE by the frozen rule; item 9 INCONCLUSIVE
+
+- The researcher ran the D2 notebook on Colab G4 (commit 764c93a, 1197 s, 40 files confirmed by MD5). Gate D passed
+  exactly, the full-region check included, which confirms the cause found in d2_r2. W4 put no enhancing label in the
+  removed core in any seed, and neither W4 nor W7 was flagged.
+- PROMOTE means the localized recipe at start 501 (W4, W7) is ready for the training series. It establishes neither
+  H1 nor H2: one patient, 3 seeds.
+- Findings for the training series' card:
+  - The fixed mask does not brighten the scenario's pieces (W6 minus W6e -0.004 to -0.014, within the seed range).
+  - The free mask keeps 17 to 40% of the pieces.
+  - Anchoring keeps raw drift outside E at 1.04 times the VAE's own error, against 3.7 without anchoring.
+  - No arm beats the scaffold on the primary MAE against the real scan (0.121; W4 0.125 to 0.131).

@@ -589,3 +589,9 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - d2_r2: REJECT (full-region check). Cause: shared-scheduler state changed by `add_noise`. Fix: `sampling._noised`,
   and a scheduler copy per D2 run. Tests (local only): 61 passed on the localized-sampling, D2 and model files (the new scheduler-watch test fails on the old code); wide suite 381 passed; Codex's sampler-using tests 147 passed.
 - Notebook default run tag d2_r3. Next: the researcher reruns D2.
+
+## 2026-11-23 - D2 d2_r3 recorded: PROMOTE
+
+- Every Gate D check was exact. The numbers match d2_r2 to 0.0001 (W2 identical), so the fix changed nothing of
+  substance. Item 9 INCONCLUSIVE. Summary saved privately in `data/RHUH-GBM/synthesis/EXP-2026-008/`.
+- Next: the LUMIERE part of C4 (CPU); then the training series' card (EXP-2026-007), starting from D2's findings.
