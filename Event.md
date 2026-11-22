@@ -1052,3 +1052,18 @@ after run r1.
   the scaffold's weight.
 - The choices made at implementation are listed in the card. Next: the D2 notebook, with Codex's review of the card
   and of D1 before its GPU run.
+
+## 2026-11-22 - EXP-2026-008 revised after Codex's review; the researcher approved all changes
+
+- Codex reviewed the card and D1 (findings C01 to C11). Claude checked each finding against the code and the
+  records, and all hold. The researcher approved every change ("I approve all changes"). The researcher also asked
+  that the findings be built into the plan, not committed as comments. The card and `PHASE2_PLAN.md` now carry them as
+  plan text, and the card ends with a summary of the findings and responses; the comment lines are not kept.
+- Design: D2 gains three arms. W1r is the residual scaffold without a model. W4g edits the whole slice from W4's
+  start. W6e is W6 with an empty fixed mask. Item 9 is read on W6 against W6e, which differ only in the mask.
+- Interpretation: Gate D is a wiring gate, and PROMOTE means readiness for the E runs. The readouts are frozen:
+  volumes in 1-mm voxels, seed range, raw or composed image, repeat tolerance, a start rule against the VAE
+  round-trip error, and drift and edge-jump rules.
+- Code: the fixed mask rows are noised to timestep 0 as in training; localized editing runs with DDIM only; the C4
+  entrypoint requires the frozen training allowlist. The C4 record is unchanged.
+- Budget: 8 neural arms instead of 6.

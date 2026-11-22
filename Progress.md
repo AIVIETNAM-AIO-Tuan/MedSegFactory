@@ -548,3 +548,13 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   on the publish tree: 352 passed (the synthesis, LUMIERE, scaffold, D1, Colab-package and rhuh_qc test files); in the main tree, the 5 test files of Codex's modules that call the sampler, 147 passed.
 - Next: the D2 wiring notebook (Colab GPU, run by the researcher), after Codex's review; the LUMIERE part of C4 on
   r2's 25 accepted training-role pairs.
+
+## 2026-11-22 - EXP-2026-008 review changes made
+
+- The card and Package D of `PHASE2_PLAN.md` were revised, with the review's findings built in and no comment lines.
+- `rhuh_synthesis/sampling.py`: fixed mask rows noised to timestep 0; localized editing with DDIM only.
+  `scripts/scaffold_check.py`: positive training allowlist. On the real exports it accepts the same 24 patients as
+  `c4_rhuh_v1`.
+- Tests (local only): `test_localized_sampling.py` 19 passed; `test_scaffold_check.py` 5 passed; with
+  `test_synthesis_model.py` and `test_scaffold.py`, 53 passed. Two new deliberate faults were each caught.
+- Next: the researcher and Codex look at the revised card; then the D2 notebook. The LUMIERE part of C4 can run.

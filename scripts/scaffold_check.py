@@ -27,16 +27,30 @@ PRIVATE = REPO / "data" / "RHUH-GBM" / "synthesis"
 
 
 def training_exports(export_root, policy, split):
-    """Accepted training exports, one per patient, refusing validation and test patients."""
-    held_out = set(split["roles"]["val"]["patients"]) | set(split["roles"]["test"]["patients"])
+    """Accepted training exports, one per patient: exactly the frozen training role minus the policy's exclusions.
+
+    Refuses validation and test patients, any patient outside the frozen training role, and a missing accepted
+    training patient. Messages name no patient.
+    """
+    roles = split["roles"]
+    held_out = set(roles["val"]["patients"]) | set(roles["test"]["patients"])
+    train = set(roles["train"]["patients"])
     paths = sorted(Path(export_root).glob("train*/RHUH-*.npz"))
     stems = [path.stem for path in paths]
     if len(stems) != len(set(stems)):
         sys.exit("A patient appears in more than one export folder; resolve before scoring")
     if set(stems) & held_out:
         sys.exit("A validation or test patient is in a training export folder")
+    if set(stems) - train:
+        sys.exit(f"{len(set(stems) - train)} training export(s) belong to no frozen training patient")
     excluded = set(policy["excluded_training"])
-    return [path for path in paths if path.stem not in excluded]
+    if excluded - train:
+        sys.exit("The acceptance policy excludes a patient outside the frozen training role")
+    accepted = [path for path in paths if path.stem not in excluded]
+    missing = (train - excluded) - {path.stem for path in accepted}
+    if missing:
+        sys.exit(f"{len(missing)} accepted training patient(s) have no export")
+    return accepted
 
 
 def spread(values):

@@ -163,19 +163,24 @@ clinician is available. So it must pass a test that it can fail before any of it
 | Step | Work |
 |---|---|
 | D1 | Per-step source anchoring in `sampling.sample_pairs`, with the stored base noise reused for the source path; tests for empty and full edit masks |
-| D2 | One-patient wiring test on a 12-slice slab: start 501 and 981, mask start pre-op vs empty, seeds 11/22/33 |
+| D2 | One-patient wiring test on a 12-slice slab: start 501 and 981, mask start pre-op vs empty, seeds 11/22/33; matched controls for the fixed mask and for the anchoring (EXP-2026-008, revised 2026-11-22 after Codex's review) |
 
 - Read at D2: enhancing label produced inside the removed region, change outside the edit region before composition,
   boundary jumps, runtime and memory.
 - Proposed arm (item 9): the mask stream is held fixed to the scenario mask and only the image is denoised, so the
   label is exact by construction. No retraining is needed, because `model.training_loss` already draws a separate
-  timestep for the image row and the mask row; `sampling.sample_pairs` needs per-row timesteps and must skip the
-  scheduler step for the mask rows. Untested: how strongly the image follows the mask stream has never been measured.
-  Read for this arm: T1ce intensity inside the scenario's enhancing pieces against the same seed without residual,
-  and whether a piece copied into the scaffold survives the edit.
-- Start rule (proposal): use 501. Keep 981 only as the contrast. Add 701 if 501 leaves the scaffold visibly unchanged.
+  timestep for the image row and the mask row. D1 gives the mask rows timestep 0 and resets them after each joint
+  scheduler step. Untested: how strongly the image follows the mask stream has never been measured.
+  - Read for this arm (revised 2026-11-22 after Codex's review): T1ce intensity inside the scenario's pieces against
+    a matched run that differs only in its fixed mask, which is empty. Nearby rim voxels serve as a control region.
+    The first design compared against a no-residual run, which also differs in the start image and the prompt.
+  - Also read: whether a piece copied into the scaffold survives the edit.
+- Start rule: use 501. Keep 981 only as the contrast. Add 701 if 501's raw change inside the core stays within the
+  VAE's own round-trip error (frozen in EXP-2026-008).
 - Gate D: no enhancing label in the removed region for the no-residual scenario in at least 2 of 3 seeds, and exact
   source identity outside the edit region after composition.
+  - It is a wiring gate: the composition enforces the identity, and an unchanged scaffold passes it. The mask
+    response and the added value over the scaffold are read separately (EXP-2026-008).
 
 ### Package E — Training series (card EXP-2026-007)
 
@@ -242,7 +247,7 @@ Then: B3-B5 after A2; C4 after C1-C3 and A7; D2 after C and D1 (GPU); E1-E2 afte
 | Three RHUH validation patients | LUMIERE development set adds held-out patients; results reported per cohort |
 | Edema labels outside the edit region stay as pre-op | Accepted for this phase; about 43 ml differs from the real post-op labels; edema is not the target |
 | The registration rule was calibrated on RHUH | Shuffled-pair control on LUMIERE; a LUMIERE rule would be a new policy version calibrated on training-role pairs only |
-| A fixed mask does not prove the image shows the labelled tissue | The fixed-mask arm is read on image intensity inside the scenario's pieces, not on the mask |
+| A fixed mask does not prove the image shows the labelled tissue | The fixed-mask arm is read on image intensity inside the scenario's pieces, against a matched run with an empty fixed mask, not on the mask |
 | Gains from synthetic data may be small (the survey quotes a 0.007 Dice gain on enhancing tumor for the BraTS 2024 winner, with losses on two other classes) while RHUH's test set has 6 patients | A second real test set from LUMIERE patients kept out of training (item 12), reported as its own stratum with week-level timing |
 
 ## 8. Decisions needed
@@ -256,7 +261,7 @@ Then: B3-B5 after A2; C4 after C1-C3 and A7; D2 after C and D1 (GPU); E1-E2 afte
 | 5 | LUMIERE masks | Pre-op: DeepBraTumIA with a cross-check. Post-op: no voxel label as a target until Gate B passes | decided 2026-11-17 |
 | 6 | Add a cavity class to the mask now | No; keep RHUH's convention this phase | open |
 | 7 | Bundle the two E1 edits | Yes | open |
-| 8 | Gate thresholds in A, B, D and E | Freeze in each card after review | open; A's are listed in EXP-2026-005 |
+| 8 | Gate thresholds in A, B, D and E | Freeze in each card after review | open; A's are listed in EXP-2026-005; D's were frozen in EXP-2026-008 after Codex's review and approved on 2026-11-22 |
 | 9 | Sampler arm with the mask held fixed to the scenario (Package D) | Add it to the wiring test D2 | approved 2026-11-21 |
 | 10 | Labelled pre-op scans as extra training rows (run E4) | RHUH pre-op first, then LUMIERE training-role pre-op; only if D2 shows the failure; MU not used for this | the researcher's proposal (LUMIERE in place of MU); approved 2026-11-21 |
 | 11 | Memorization check in every training run | Add it | approved 2026-11-21 |
