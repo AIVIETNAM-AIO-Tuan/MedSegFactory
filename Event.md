@@ -1028,3 +1028,16 @@ after run r1.
   Colab runs. A laptop check showed that ITK's multi-threaded registration does not repeat exactly when it runs on
   more than one thread, and repeats exactly on one thread. No change is made to r2; pinning the thread count for
   future registration runs is proposed to the researcher.
+
+## 2026-11-22 - Later registration runs use one ITK thread; Colab notebooks install from one package list
+
+- Approved by the researcher ("okay I approve"): later registration runs pin the ITK thread count to 1 and record
+  the CPU count and the thread count in the run record. Reason: on more than one thread the rigid registration does
+  not repeat exactly; on one thread it did, in all 4 laptop cases (EXP-2026-005, run r2 evidence). Runs already
+  recorded (RHUH, LUMIERE r1 and r2) are not rerun. It will be applied, with its tests, when the next registration
+  run is prepared.
+- The researcher asked that notebooks install every package the code needs that Colab lacks. They had to add pydicom
+  by hand to the r1 and r2 export notebooks: `manifest` imports it through `rhuh_qc.dicom`. New notebooks install
+  from `rhuh_synthesis/colab_packages.py` (`DATA`, plus `MODEL` for GPU work). A local test checks that every
+  third-party import of the code is installed by those lists or provided by Colab. Notebooks of completed runs are
+  not edited.

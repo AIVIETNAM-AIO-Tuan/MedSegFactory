@@ -529,3 +529,12 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   wrong-patient pairs by up to 17 mm.
 - Next: EXP-2026-008 D1 (sampler extension, CPU tests only). Then the LUMIERE part of C4 on the 25 accepted
   training-role pairs, which needs a short Colab CPU notebook.
+
+## 2026-11-22 - Registration threads and Colab packages
+
+- Approved: one ITK thread for later registration runs, with the CPU and thread counts recorded. Not applied yet:
+  no registration run is planned.
+- Added `rhuh_synthesis/colab_packages.py`, the one list of packages for Colab notebooks (pydicom was missing from
+  the LUMIERE notebooks). Local test `tests/test_colab_packages.py`: 3 passed, and it fails when pydicom is removed
+  from the list.
+- Next: EXP-2026-008 D1.
