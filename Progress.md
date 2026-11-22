@@ -481,3 +481,17 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - On the laptop's 4-pair dev run the check reproduced that run's Dice exactly: all PIR, flips identical, Dice 0.0
   when read as stored.
 - Next: the researcher runs the check and sends the DIAGNOSTIC block. Claude starts EXP-2026-008 with C1 to C4.
+
+## 2026-11-22 - EXP-2026-008 package C done; Gate C passed on RHUH
+
+- Code: `rhuh_synthesis/scaffold.py` (scaffold, residual pieces, regions, start mask, slice classes, C4 check) and
+  `scripts/scaffold_check.py`.
+- Tests: `python -m pytest -q tests/test_scaffold.py`, 10 passed (local only).
+- C4 run `c4_rhuh_v1` (laptop CPU, 24 accepted RHUH training patients):
+  - scaffold gain over a copy 0.0271 [0.0190, 0.0357], lower in 23 of 24;
+  - no-residual patients 0.0312, lower in 17 of 17;
+  - the old recipe reproduces 0.0268 exactly.
+- Waiting:
+  - the LUMIERE part of C4 needs settled training-role pairs (reading check pending);
+  - Codex's review of the card goes through the researcher.
+- Next: D1 sampler extension with CPU tests, then the D2 wiring notebook for Colab.

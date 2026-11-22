@@ -971,3 +971,16 @@ The researcher answered "okay" to the two proposals put after run r1:
   - A new run with a revised reading rule would need the researcher's approval after this check. It would be
     recorded as a deviation found after r1.
 - EXP-2026-008 (scaffold, residual rule, localized sampler) approved for implementation.
+
+## 2026-11-22 - EXP-2026-008 package C implemented; Gate C passed on RHUH
+
+- `rhuh_synthesis/scaffold.py` and `scripts/scaffold_check.py`.
+- Correction to the card, found at implementation: the card's scaffold matches the 2026-11-17 recipe inside the
+  pre-op core only. In the 2-mm band outside the core, the old script also mixed in nearby edema-like tissue. C4
+  scored both recipes with the same code; they differ by a median of -0.0001.
+- C4 on the 24 accepted RHUH training patients, scored with the frozen image scores:
+  - scaffold gain over a copy: 0.0271 (95% patient bootstrap 0.0190 to 0.0357), lower in 23 of 24;
+  - without residual tumor: 0.0312, lower in 17 of 17;
+  - the old recipe reproduces the 2026-11-17 numbers exactly (0.0268, 0.0189 to 0.0353).
+- Nothing changes outside the edit region, and repeats are identical.
+- Gate C passes on RHUH. It is a reproduction on the patients the idea came from, not new evidence.
