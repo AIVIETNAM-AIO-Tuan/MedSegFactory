@@ -11,6 +11,8 @@ Arrays are ``[Z, Y, X]`` on the 1-mm pre-op frame, as in the exports. Label IDs 
 - C3 ``edit_regions``, ``start_mask`` and ``slice_scenario_ids``: the image edit region E (K and its ramp), the mask
   edit region M (all pre-op labels plus 3 mm), the start mask (empty in M, ID 3 at the pieces) and the per-slice
   class sets for supplied-scenario prompts.
+- D1 ``edit_weight`` and ``compose_edit``: the final composition of a localized edit. The decoded image is blended
+  in over E only, and the decoded mask is used inside M only.
 
 No post-op input is read here. A scenario is a supplied counterfactual, not a forecast of the real outcome, and its
 pieces are synthetic labels, never ground truth.
@@ -206,6 +208,38 @@ def start_mask(pre_label, pieces, mask_region):
     out = np.where(mask_region, 0, label).astype(label.dtype)
     out[pieces] = ENHANCING_ID
     return out
+
+
+def edit_weight(pre_label, spacing, width_mm=RAMP_MM):
+    """D1: the composition weight ``w_E``. 1 in the core K, the residual pieces included; it ramps to 0 outside K.
+
+    Unlike the scaffold's weight, it is not 0 on the pieces, so the model's output is used there. ``w_E > 0`` is
+    exactly E of ``edit_regions``.
+    """
+    return ramp(core_mask(pre_label), spacing, width_mm)
+
+
+def compose_edit(decoded_image, scaffold, weight, decoded_mask, start, mask_region, *, fixed_mask=False):
+    """D1: final composition of a localized edit, on arrays that share one grid. Returns ``(image, mask)``.
+
+    - Image: ``weight * decoded + (1 - weight) * scaffold`` where ``weight > 0``, and exactly ``scaffold`` elsewhere,
+      that is outside E. Pass ``edit_weight``, not the scaffold's weight.
+    - Mask: the decoded mask inside ``mask_region`` (M) and ``start`` outside it. With ``fixed_mask``, ``start`` (the
+      scenario mask) everywhere.
+    """
+    decoded_image = np.asarray(decoded_image, np.float32)
+    scaffold = np.asarray(scaffold, np.float32)
+    weight = np.asarray(weight, np.float32)
+    decoded_mask, start = np.asarray(decoded_mask), np.asarray(start)
+    mask_region = np.asarray(mask_region, bool)
+    if len({a.shape for a in (decoded_image, scaffold, weight, decoded_mask, start, mask_region)}) != 1:
+        raise ValueError("compose_edit needs arrays of one shape")
+    if weight.size and (weight.min() < 0 or weight.max() > 1):
+        raise ValueError("weight must lie in [0, 1]")
+    blend = weight * decoded_image + (1.0 - weight) * scaffold
+    image = np.where(weight > 0, blend, scaffold).astype(np.float32)
+    mask = start.copy() if fixed_mask else np.where(mask_region, decoded_mask, start).astype(start.dtype)
+    return image, mask
 
 
 def slice_scenario_ids(pre_label, pieces):

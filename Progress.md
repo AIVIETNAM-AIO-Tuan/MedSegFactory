@@ -538,3 +538,13 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   the LUMIERE notebooks). Local test `tests/test_colab_packages.py`: 3 passed, and it fails when pydicom is removed
   from the list.
 - Next: EXP-2026-008 D1.
+
+## 2026-11-22 - EXP-2026-008 D1 done
+
+- `rhuh_synthesis/sampling.py`: `LocalizedEdit`, `latent_support`, `sample_pairs(edit=...)`.
+  `rhuh_synthesis/scaffold.py`: `edit_weight`, `compose_edit`.
+- Tests (local only, CPU, tiny random UNet): `tests/test_localized_sampling.py` 18 passed; 3 deliberate faults each
+  caught; without `edit` the sampler is bit-identical to the committed one in 12 of 12 configurations. Wider suites
+  on the publish tree: 352 passed (the synthesis, LUMIERE, scaffold, D1, Colab-package and rhuh_qc test files); in the main tree, the 5 test files of Codex's modules that call the sampler, 147 passed.
+- Next: the D2 wiring notebook (Colab GPU, run by the researcher), after Codex's review; the LUMIERE part of C4 on
+  r2's 25 accepted training-role pairs.

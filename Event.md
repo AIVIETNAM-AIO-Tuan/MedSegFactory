@@ -1041,3 +1041,14 @@ after run r1.
   from `rhuh_synthesis/colab_packages.py` (`DATA`, plus `MODEL` for GPU work). A local test checks that every
   third-party import of the code is installed by those lists or provided by Colab. Notebooks of completed runs are
   not edited.
+
+## 2026-11-22 - EXP-2026-008 D1: localized sampling implemented
+
+- `sample_pairs` takes an optional `LocalizedEdit`. The run starts at `t_start` from the noised source; outside the
+  latent support of the edit regions the latents are reset to the noised source before every model call, and to the
+  clean source after the last step. An optional fixed mask holds the mask rows at the clean scenario latent with
+  timestep 0. Without `edit` the sampler is unchanged: bit-identical in 12 of 12 test configurations.
+- Final composition: `scaffold.compose_edit` with the weight `edit_weight`, which is 1 on the residual pieces, unlike
+  the scaffold's weight.
+- The choices made at implementation are listed in the card. Next: the D2 notebook, with Codex's review of the card
+  and of D1 before its GPU run.

@@ -25,17 +25,104 @@ Adapted from the released ``StableDiffusion/Our_Pipe.py`` denoising loop
   schedule.
 
 Decoding and the mask codec live elsewhere; this module returns latents only.
+
+Localized editing (EXP-2026-008, D1) is optional: ``sample_pairs(..., edit=LocalizedEdit(...))``. Without ``edit``
+the sampler runs exactly as described above.
+
+- The run starts at ``edit.t_start`` from the source latents noised with the stored ``edit.base_noise``
+  (``scheduler.add_noise``). Without ``t_start`` it starts from ``base_noise * init_noise_sigma`` at the first
+  timestep, as the plain sampler does.
+- Before each model call, latents outside the latent support of the image region (image rows) and the mask region
+  (mask rows) are replaced by the source latents noised to the current timestep with the same base noise. After the
+  last step they are replaced by the clean source latents.
+- With ``edit.fixed_mask``, the mask rows hold the clean source mask latent at every call, with timestep 0 for
+  those rows. Training draws each row's timestep separately (``model.training_loss``), so a nearly clean mask row
+  next to a noisier image row also occurs in training. The scheduler still takes one joint step on both streams,
+  and the mask rows are then reset.
 """
 
 import inspect
 import operator
+from dataclasses import dataclass
+from typing import Optional
 
 import torch
 from diffusers.utils.torch_utils import randn_tensor
 
 from .model import _check_generator, _check_unet_io, stack_unet_input
 
-__all__ = ["sample_pairs"]
+__all__ = ["LocalizedEdit", "latent_support", "sample_pairs"]
+
+
+@dataclass(frozen=True)
+class LocalizedEdit:
+    """Inputs of the localized sampler. Latents are scaled by the VAE scaling factor, like the sampler's own.
+
+    - ``source_image`` [B, C, h, w]: e.g. the scaffold's posterior-mean latent.
+    - ``source_mask`` [B, C, h, w]: the clean latent of the start mask; with ``fixed_mask``, of the scenario mask.
+    - ``base_noise`` [2B, C, h, w]: rows ``:B`` image, ``B:`` mask. Stored, so that arms can share it.
+    - ``image_region``, ``mask_region`` [B, 1, h, w] bool: latent supports of the edit regions (``latent_support``).
+    - ``t_start``: one of the scheduler's timesteps, or None to start from noise at the first one.
+    - ``fixed_mask``: the mask rows hold ``source_mask`` with timestep 0 throughout.
+    """
+
+    source_image: torch.Tensor
+    source_mask: torch.Tensor
+    base_noise: torch.Tensor
+    image_region: torch.Tensor
+    mask_region: torch.Tensor
+    t_start: Optional[int] = None
+    fixed_mask: bool = False
+
+
+def latent_support(region, cell=8):
+    """Latent cells that a pixel region touches: [B, H, W] bool -> [B, 1, H / cell, W / cell] bool tensor."""
+    region = torch.as_tensor(region)
+    if region.dtype != torch.bool or region.ndim != 3:
+        raise ValueError("region must be a boolean [B, H, W] array or tensor")
+    cell = operator.index(cell)
+    batch, height, width = region.shape
+    if cell < 1 or height % cell or width % cell:
+        raise ValueError(f"H={height} and W={width} must both be divisible by cell={cell}")
+    blocks = region.reshape(batch, height // cell, cell, width // cell, cell)
+    return blocks.any(dim=4).any(dim=2)[:, None]
+
+
+def _checked_edit(edit, shape, device, dtype):
+    """``edit``'s tensors on the latents' device and dtype, after shape checks."""
+    if not isinstance(edit, LocalizedEdit):
+        raise TypeError(f"edit must be a LocalizedEdit, got {type(edit).__name__}")
+    batch, channels, height, width = shape
+    expected = {
+        "source_image": (batch, channels, height, width),
+        "source_mask": (batch, channels, height, width),
+        "base_noise": (2 * batch, channels, height, width),
+        "image_region": (batch, 1, height, width),
+        "mask_region": (batch, 1, height, width),
+    }
+    for name, wanted in expected.items():
+        tensor = getattr(edit, name)
+        if not torch.is_tensor(tensor) or tuple(tensor.shape) != wanted:
+            raise ValueError(f"edit.{name} must be a tensor shaped {wanted}")
+    for name in ("image_region", "mask_region"):
+        if getattr(edit, name).dtype != torch.bool:
+            raise ValueError(f"edit.{name} must be boolean")
+    return {
+        "source_image": edit.source_image.to(device=device, dtype=dtype),
+        "source_mask": edit.source_mask.to(device=device, dtype=dtype),
+        "base_noise": edit.base_noise.to(device=device, dtype=dtype),
+        "image_region": edit.image_region.to(device=device),
+        "mask_region": edit.mask_region.to(device=device),
+    }
+
+
+def _start_index(timesteps, t_start):
+    if t_start is None:
+        return 0
+    hits = (timesteps == operator.index(t_start)).nonzero().flatten()
+    if not len(hits):
+        raise ValueError(f"t_start={t_start} is not one of the scheduler's timesteps {timesteps.tolist()}")
+    return int(hits[0])
 
 
 @torch.no_grad()
@@ -54,6 +141,7 @@ def sample_pairs(
     generator=None,
     latent_channels=4,
     initial_latents=None,
+    edit=None,
 ):
     """Generate B paired (post-op image, mask) latents conditioned on pre-op inputs.
 
@@ -68,6 +156,9 @@ def sample_pairs(
     [2B, latent_channels, h, w] (rows ``:B`` image, ``B:`` mask), if given,
     replace ``noise * init_noise_sigma`` as the latents entering the first
     timestep, and no initial noise is drawn.
+
+    ``edit`` (optional ``LocalizedEdit``) turns on localized editing, as described in the module docstring; it
+    cannot be combined with ``initial_latents``, and no initial noise is drawn. Without it, nothing changes.
 
     ``scheduler.set_timesteps`` resets and ``scheduler.step`` advances the
     passed scheduler, as in a diffusers pipeline; tensor inputs are never
@@ -112,7 +203,18 @@ def sample_pairs(
 
     scheduler.set_timesteps(num_inference_steps, device=device)
     shape = (2 * batch, latent_channels, height, width)
-    if initial_latents is None:
+    timesteps = scheduler.timesteps
+    if edit is not None:
+        if initial_latents is not None:
+            raise ValueError("Pass either initial_latents or edit, not both")
+        local = _checked_edit(edit, (batch, latent_channels, height, width), device, dtype)
+        timesteps = timesteps[_start_index(timesteps, edit.t_start):]
+        source = torch.cat([local["source_image"], local["source_mask"]], dim=0)
+        if edit.t_start is None:
+            latents = local["base_noise"] * scheduler.init_noise_sigma
+        else:
+            latents = scheduler.add_noise(source, local["base_noise"], timesteps[:1])
+    elif initial_latents is None:
         latents = randn_tensor(shape, generator=generator, device=device, dtype=dtype)
         latents = latents * scheduler.init_noise_sigma
     elif not torch.is_tensor(initial_latents) or tuple(initial_latents.shape) != shape:
@@ -121,13 +223,25 @@ def sample_pairs(
         latents = initial_latents.to(device=device, dtype=dtype)
     image_latents, mask_latents = latents[:batch], latents[batch:]
     step_kwargs = _extra_step_kwargs(scheduler, generator)
+    fixed = edit is not None and edit.fixed_mask
 
-    for t in scheduler.timesteps:
+    for t in timesteps:
+        if edit is not None:  # outside the regions, the source noised to this timestep with the same noise
+            anchor = scheduler.add_noise(source, local["base_noise"], t.reshape(1))
+            image_latents = torch.where(local["image_region"], image_latents, anchor[:batch])
+            if fixed:
+                mask_latents = local["source_mask"]
+            else:
+                mask_latents = torch.where(local["mask_region"], mask_latents, anchor[batch:])
         noisy = torch.cat([image_latents, image_latents, mask_latents, mask_latents], dim=0)
         noisy = scheduler.scale_model_input(noisy, t)
+        unet_t = t
+        if fixed:  # clean mask rows at timestep 0, never scaled
+            noisy = torch.cat([noisy[: 2 * batch], local["source_mask"], local["source_mask"]], dim=0)
+            unet_t = torch.cat([t.expand(2 * batch), torch.zeros(2 * batch, dtype=t.dtype, device=t.device)])
         model_input = stack_unet_input(noisy[: 2 * batch], noisy[2 * batch :], z_rows, m_rows)
         noise_pred = unet(
-            model_input, t, encoder_hidden_states=encoder_hidden_states, return_dict=False
+            model_input, unet_t, encoder_hidden_states=encoder_hidden_states, return_dict=False
         )[0]
         image_text, image_uncond, mask_text, mask_uncond = noise_pred.chunk(4, dim=0)
         image_pred = image_uncond + guidance_scale * (image_text - image_uncond)
@@ -140,6 +254,12 @@ def sample_pairs(
             return_dict=False,
         )[0]
         image_latents, mask_latents = stepped[:batch], stepped[batch:]
+        if fixed:
+            mask_latents = local["source_mask"]
+    if edit is not None:  # after the last step, the clean source outside the regions
+        image_latents = torch.where(local["image_region"], image_latents, local["source_image"])
+        if not fixed:
+            mask_latents = torch.where(local["mask_region"], mask_latents, local["source_mask"])
     return image_latents, mask_latents
 
 
