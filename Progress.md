@@ -495,3 +495,11 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   - the LUMIERE part of C4 needs settled training-role pairs (reading check pending);
   - Codex's review of the card goes through the researcher.
 - Next: D1 sampler extension with CPU tests, then the D2 wiring notebook for Colab.
+
+## 2026-11-22 - Reading check done: 3 of r1's 5 mask exclusions are reading artifacts
+
+- The flip of HD-GLIO-AUTO's files follows the native orientation: flipped for the 30 PIR pre-op scans, unflipped
+  for the 3 LPS ones.
+- Read as stored, the 3 LPS pairs agree with DeepBraTumIA (Dice 0.73 to 0.89). The other 2 exclusions are genuine.
+- Blocker: the researcher's decision on a revised run with a reading per orientation group (new run tag and split).
+- Next: on approval, change the rule in `lumiere_export.mask_check`, test it, and hand over a rerun notebook.

@@ -984,3 +984,20 @@ The researcher answered "okay" to the two proposals put after run r1:
   - the old recipe reproduces the 2026-11-17 numbers exactly (0.0268, 0.0189 to 0.0353).
 - Nothing changes outside the edit region, and repeats are identical.
 - Gate C passes on RHUH. It is a reproduction on the patients the idea came from, not new evidence.
+
+## 2026-11-22 - Reading check of run r1: the HD-GLIO-AUTO flip follows scan orientation
+
+The researcher ran `notebooks/LUMIERE_Colab_reading_check.ipynb` (commit 755ef7d, 142 s). Counts only:
+
+- Pre-op native orientation: 30 PIR, 3 LPS. All PIR scans vote for the flipped files; all LPS scans vote for the
+  files as stored.
+- 3 of r1's 5 mask exclusions are the 3 LPS scans. Read as stored, the two tools agree (Dice 0.73, 0.86, 0.89).
+  They were excluded by the one-reading rule, not by a doubtful DeepBraTumIA mask.
+- The other 2 exclusions hold under every reading:
+  - neither tool finds an enhancing tumor in one;
+  - the tools disagree on extent in the other (Dice 0.47).
+- None of the 28 pairs r1 kept would change.
+- Post-op scans cannot vote reliably: after a complete resection no label is bright.
+
+Consequence: r1's 27 accepted pairs stand, but r1 dropped every LPS scan. Proposed to the researcher, not started: a
+new run with a reading chosen per orientation group. The 0.5 threshold stays as approved.
