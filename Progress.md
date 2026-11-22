@@ -583,3 +583,9 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - Cause and fix as in Event.md. Tests (local only): 59 passed on the D2, localized-sampling and model files; 54 on the
   generation-path files; 147 on Codex's sampler-using tests.
 - The notebook's default run tag is now d2_r2. Next: the researcher reruns the D2 notebook.
+
+## 2026-11-22 - D2 d2_r2 analysed; fix for the scheduler side effect
+
+- d2_r2: REJECT (full-region check). Cause: shared-scheduler state changed by `add_noise`. Fix: `sampling._noised`,
+  and a scheduler copy per D2 run. Tests (local only): 61 passed on the localized-sampling, D2 and model files (the new scheduler-watch test fails on the old code); wide suite 381 passed; Codex's sampler-using tests 147 passed.
+- Notebook default run tag d2_r3. Next: the researcher reruns D2.

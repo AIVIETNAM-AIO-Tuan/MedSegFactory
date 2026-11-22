@@ -29,8 +29,9 @@ Decoding and the mask codec live elsewhere; this module returns latents only.
 Localized editing (EXP-2026-008, D1) is optional: ``sample_pairs(..., edit=LocalizedEdit(...))``. Without ``edit``
 the sampler runs exactly as described above.
 
-- The run starts at ``edit.t_start`` from the source latents noised with the stored ``edit.base_noise``
-  (``scheduler.add_noise``). Without ``t_start`` it starts from ``base_noise * init_noise_sigma`` at the first
+- The run starts at ``edit.t_start`` from the source latents noised with the stored ``edit.base_noise`` (the formula
+  of ``scheduler.add_noise``, computed without changing the scheduler's state; see ``_noised``). Without
+  ``t_start`` it starts from ``base_noise * init_noise_sigma`` at the first
   timestep, as the plain sampler does.
 - Before each model call, latents outside the latent support of the image region (image rows) and the mask region
   (mask rows) are replaced by the source latents noised to the current timestep with the same base noise. After the
@@ -125,6 +126,21 @@ def _checked_edit(edit, shape, device, dtype):
         "image_region": edit.image_region.to(device=device),
         "mask_region": edit.mask_region.to(device=device),
     }
+
+
+def _noised(scheduler, clean, noise, timestep):
+    """``scheduler.add_noise`` at one timestep, with the same formula but without its side effect.
+
+    diffusers' DDIM ``add_noise`` moves ``scheduler.alphas_cumprod`` to the samples' device in place. Every later
+    ``scheduler.step`` then does its scalar arithmetic on that device instead of the CPU, so a run's result depended on
+    whether a localized run had used the same scheduler before. The first D2 run on a GPU showed this (EXP-2026-008).
+    """
+    alphas = scheduler.alphas_cumprod.to(dtype=clean.dtype)  # a copy; the scheduler's own tensor stays where it is
+    index = torch.tensor([int(timestep)])
+    shape = (-1,) + (1,) * (clean.ndim - 1)
+    signal = (alphas[index] ** 0.5).reshape(shape).to(clean.device)
+    spread = ((1 - alphas[index]) ** 0.5).reshape(shape).to(clean.device)
+    return signal * clean + spread * noise
 
 
 def _start_index(timesteps, t_start):
@@ -229,10 +245,9 @@ def sample_pairs(
         if edit.t_start is None:
             latents = local["base_noise"] * scheduler.init_noise_sigma
         else:
-            latents = scheduler.add_noise(source, local["base_noise"], timesteps[:1])
+            latents = _noised(scheduler, source, local["base_noise"], timesteps[0])
         if edit.fixed_mask:  # the scenario mask at timestep 0, noised as training noises a row there
-            zero = torch.zeros(1, dtype=timesteps.dtype, device=timesteps.device)
-            fixed_rows = scheduler.add_noise(local["source_mask"], local["base_noise"][batch:], zero)
+            fixed_rows = _noised(scheduler, local["source_mask"], local["base_noise"][batch:], 0)
     elif initial_latents is None:
         latents = randn_tensor(shape, generator=generator, device=device, dtype=dtype)
         latents = latents * scheduler.init_noise_sigma
@@ -246,7 +261,7 @@ def sample_pairs(
 
     for t in timesteps:
         if edit is not None:  # outside the regions, the source noised to this timestep with the same noise
-            anchor = scheduler.add_noise(source, local["base_noise"], t.reshape(1))
+            anchor = _noised(scheduler, source, local["base_noise"], t)
             image_latents = torch.where(local["image_region"], image_latents, anchor[:batch])
             if fixed:
                 mask_latents = fixed_rows

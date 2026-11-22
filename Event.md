@@ -1100,3 +1100,19 @@ after run r1.
   latents to the CUDA VAE: `sampling.decode_images` cast the dtype but not the device. The CPU tests could not see it.
 - Fixed: decoding moves latents to the VAE's device; the D2 sampler takes the VAE's own device for the mask latents. A
   meta-device test now covers this bug class. No output was written; the next attempt is d2_r2.
+
+## 2026-11-22 - EXP-2026-008 D2 run d2_r2: REJECT through the full-region check; cause found and fixed
+
+- The run completed on the researcher's Colab G4 (1197 s, 40 files confirmed by MD5). By the frozen rule it is
+  REJECT. The localized sampler with whole-slice regions differed from W2 by 0.0886 at most in the raw image, against
+  a tolerance of 1e-4. The other Gate D checks were exact, the repeat included.
+- Cause: diffusers' DDIM `add_noise` moves the scheduler's `alphas_cumprod` to the GPU in place, and D1 called it on
+  the scheduler all arms shared. W2, run first, stepped with CPU values; every later run stepped with GPU values. Fixed:
+  D1 computes the noised latents without changing the scheduler, and every D2 run gets its own scheduler copy.
+- Descriptive, not decisions, because Gate D failed:
+  - W4 put no enhancing label in the removed core.
+  - The fixed mask did not brighten the pieces (item 9 INCONCLUSIVE, the wrong sign in all 3 seeds); the start image
+    dominated there.
+  - Anchoring kept raw drift outside E near the VAE's own error (1.04 times, against 3.7 times without anchoring).
+  - No arm beat the scaffold on the primary MAE.
+- Next: rerun as d2_r3.

@@ -15,6 +15,7 @@ calls ``run_wiring``. Everything below is reusable code with local CPU tests.
 A scenario is a supplied counterfactual, not a forecast of the real outcome, and its pieces are synthetic labels.
 """
 
+import copy
 import time
 from pathlib import Path
 
@@ -345,16 +346,17 @@ def run_wiring(arrays, cfg, evaluation, text_config, *, unet, vae, scheduler, en
         torch.cuda.reset_peak_memory_stats()
 
     batch = cfg["batch_pairs"]
-    sample = dict(unet=unet, scheduler=scheduler, num_inference_steps=num_inference_steps,
-                  guidance_scale=guidance_scale, starts=cfg["starts"])
+    sample = dict(unet=unet, num_inference_steps=num_inference_steps, guidance_scale=guidance_scale,
+                  starts=cfg["starts"])
     outputs, seconds, batches = {}, {}, {}
 
     def sampled(name, spec, seed, regions="arm"):
         nonlocal batch
         begin = time.perf_counter()
-        with release_maps_during_forward(unet):
+        with release_maps_during_forward(unet):  # every run gets a fresh copy: no run can change another's scheduler
             result, batch = halving_batch(
-                lambda size: sampler.run(spec, seed, batch=size, regions=regions, label=name, **sample), batch)
+                lambda size: sampler.run(spec, seed, batch=size, regions=regions, label=name,
+                                         scheduler=copy.deepcopy(scheduler), **sample), batch)
         result["frame_images"] = sampler.to_frame_image(result["images"])
         result["frame_labels"] = sampler.to_frame_labels(result["masks"])
         seconds[name], batches[name] = time.perf_counter() - begin, batch
