@@ -462,3 +462,13 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - Gate A (24 accepted pairs) is reported in the summary.
 - Not known before the run: the native T1ce orientations of the cohort. The geometry run counted only the atlas
   grids, and the 4 sample patients were all PIR. The vote shows whether other orientations behave like the sample.
+
+## 2026-11-22 - EXP-2026-005 run r1 done: 27 accepted LUMIERE pairs (21 training, 6 development)
+
+- Gate A passed (27 of 24 needed). Both controls behaved. The card's outcome rule gives PROMOTE. Run evidence is in
+  the card.
+- Real pairs after registration: far correlation median 0.852 and outline Dice median 0.973; 0 export failures.
+- Open: up to 5 mask exclusions may be artifacts of the one-reading rule for HD-GLIO-AUTO's files.
+- Next, for the researcher to choose:
+  - a read-only diagnostic of the 5 exclusions;
+  - approval of EXP-2026-008 (scaffold and sampler).

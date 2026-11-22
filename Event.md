@@ -932,3 +932,30 @@ reading gets 90% of the pre-op votes.
   - No check.
 - HD-GLIO-AUTO stays a referee only: none of its labels enters an export.
 - Next: the full run of the export notebook on Colab (run tag r1).
+
+## 2026-11-22 - EXP-2026-005 full run r1: Gate A passed with 27 pairs; HD-GLIO-AUTO files not stored uniformly
+
+The researcher ran `notebooks/LUMIERE_Colab_export.ipynb` on commit 5261a97 (Colab CPU, 1608 s). All 91 record files
+are on Drive with server MD5. Counts only:
+
+- 36 pairs listed; 33 after the thick-slice rule; 28 after the mask check; 27 accepted by rule v1.
+- The 28 split into 22 training and 6 development pairs. Accepted: 21 training and 6 development.
+- Both controls behaved:
+  - shuffled masks: 0 of 33 would pass;
+  - wrong-patient registration: 0 of 22 accepted.
+- By the card's outcome rule the result is PROMOTE. The 21 accepted training-role pairs may be used by later cards.
+
+Found:
+
+- HD-GLIO-AUTO's files are not stored the same way in every study. The flipped reading won 30 of 33 votes, just
+  above the 90% threshold.
+  - The two flip candidates differ in at least one study. There the chosen one leaves 93% of the mask outside the
+    brain.
+  - 3 studies voted for the files as stored.
+- 5 pairs were excluded for tool disagreement, all complete resections. Some of these exclusions may come from the
+  one-reading rule rather than from a doubtful DeepBraTumIA mask; this is not checked.
+- A wrongly read HD-GLIO-AUTO mask can only exclude a pair, never accept one, so the 27 accepted pairs stand.
+
+Proposed to the researcher, not started: a read-only count of what the 5 exclusions are, by reading and by native
+orientation. After it, either keep r1 or make a new run with a revised reading rule, recorded as a deviation found
+after r1.
