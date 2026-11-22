@@ -1013,3 +1013,18 @@ after run r1.
   acceptance rule v1.
 - r2 replaces r1's mask check, split and exports before anything has used them. r1's records stay on Drive.
 - Config `configs/experiments/EXP-2026-005_r2.json`; r1's config file is not edited.
+
+## 2026-11-22 - EXP-2026-005 run r2 done: Gate A passed with 29 accepted pairs; r2 replaces r1
+
+- Result, counts only: 33 pairs checked; 2 excluded for tool disagreement (the two genuine cases of the reading
+  check); the 3 LPS pairs kept. 31 exported, 29 accepted: 25 of 25 training-role pairs, 4 of 6 development pairs.
+  Controls: shuffled masks 0 of 33 would pass; wrong-patient registrations 0 of 25 accepted.
+- Decision by the card's outcome rule: PROMOTE. Later cards use r2's split and exports. The 25 accepted
+  training-role pairs may be used by C4 and E3; the 4 accepted development pairs stay held out. r1's records stay on
+  Drive, superseded, and r1's split is not used.
+- Both quarantined pairs fell into the development set. The split precedes registration and is kept as drawn.
+  Held-out patients for development scoring: 4 LUMIERE plus 3 RHUH validation.
+- The 28 pairs common to r1 and r2 kept their acceptance. Their registration numbers differ slightly between the two
+  Colab runs. A laptop check showed that ITK's multi-threaded registration does not repeat exactly when it runs on
+  more than one thread, and repeats exactly on one thread. No change is made to r2; pinning the thread count for
+  future registration runs is proposed to the researcher.

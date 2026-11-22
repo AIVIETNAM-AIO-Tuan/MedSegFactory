@@ -513,3 +513,19 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - Note: a wrong-patient control registration differed between two runs on the laptop; the real pairs repeated
   exactly. The notebook compares r2 with r1 at the end.
 - Next: the researcher runs the r2 notebook on Colab (CPU, about 27 minutes) and sends SUMMARY and the comparison.
+
+## 2026-11-22 - EXP-2026-005 run r2 done
+
+- Run by the researcher on Colab CPU: commit 1668424, 2890 s, 100 files confirmed by MD5. Gate A passed with 29
+  accepted pairs against 24; PROMOTE by the card's rule.
+- Mask check as predicted: LPS read as stored (3 of 3 votes), PIR flipped (30 of 30); 2 pairs excluded; the 3 LPS
+  pairs kept.
+- Registration: 2 of 31 pairs quarantined, both in the development set, which now has 4 accepted pairs. One of them
+  is a recovered LPS pair whose registration moved away from a reasonable start.
+- Comparison with r1: the same acceptance for all 28 common pairs; the QC numbers after registration are not
+  identical (at most 0.0044 in far correlation).
+- Laptop check on the 4-pair sample (not a record): on 1 thread every registration repeated exactly (4 of 4). On 16
+  or 2 threads none did: the real pairs moved by at most 2e-7, which does not show in the QC numbers, and the
+  wrong-patient pairs by up to 17 mm.
+- Next: EXP-2026-008 D1 (sampler extension, CPU tests only). Then the LUMIERE part of C4 on the 25 accepted
+  training-role pairs, which needs a short Colab CPU notebook.
