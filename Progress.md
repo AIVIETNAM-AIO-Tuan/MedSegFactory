@@ -503,3 +503,13 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - Read as stored, the 3 LPS pairs agree with DeepBraTumIA (Dice 0.73 to 0.89). The other 2 exclusions are genuine.
 - Blocker: the researcher's decision on a revised run with a reading per orientation group (new run tag and split).
 - Next: on approval, change the rule in `lumiere_export.mask_check`, test it, and hand over a rerun notebook.
+
+## 2026-11-22 - EXP-2026-005 run r2 prepared
+
+- Code: grouped reading in `lumiere_export.mask_check`, `choose_group_readings`, `compare_with_run`.
+- Config `configs/experiments/EXP-2026-005_r2.json`; notebook `notebooks/LUMIERE_Colab_export_r2.ipynb`.
+- Tests (local only): 96 passed on the LUMIERE, scaffold and shared files, and 7 on the reading check.
+- Development run on the 4 sample pairs with the r2 config: same numbers as the earlier development run.
+- Note: a wrong-patient control registration differed between two runs on the laptop; the real pairs repeated
+  exactly. The notebook compares r2 with r1 at the end.
+- Next: the researcher runs the r2 notebook on Colab (CPU, about 27 minutes) and sends SUMMARY and the comparison.

@@ -7,11 +7,12 @@ scans. Labels are DeepBraTumIA's atlas masks, renumbered to RHUH's IDs in memory
    timing note, the licence note, native T1ce voxel sizes and the thick-slice exclusion. A transform that is not
    rigid stops the run.
 4. ``mask_check``: HD-GLIO-AUTO's native masks are first read the way the native T1ce supports (as stored, or
-   flipped along two axes: the 4-pair sample was stored flipped), by one choice for all studies. Each mask is then
-   moved into atlas space with DeepBraTumIA's CT1 transform, and its enhancing label is identified from the images
-   (higher T1ce-minus-T1 contrast). A pair is flagged when the two
-   tools' pre-op enhancing labels overlap with Dice below the configured minimum. The control compares each patient's
-   mask with another patient's (a seeded shuffle); the run stops if too many shuffled pairs would pass.
+   flipped along two axes). Run r1 made one choice for all studies. From run r2 on, the configuration can ask for one
+   choice per native orientation: r1 showed that the release stores the masks flipped for PIR scans and unflipped
+   for LPS scans. Each mask is then moved into atlas space with DeepBraTumIA's CT1 transform, and its enhancing label
+   is identified from the images (higher T1ce-minus-T1 contrast). A pair is flagged when the two tools' pre-op
+   enhancing labels overlap with Dice below the configured minimum. The control compares each patient's mask with
+   another patient's (a seeded shuffle); the run stops if too many shuffled pairs would pass.
 5. ``split_pairs``: by patient, stratified by expert rating, before registration; pinned patients go to training.
 6. ``registration_control``: each training-role post-op scan is registered to another patient's pre-op scan with the
    frozen EXP-2026-001 settings; the run stops if acceptance rule v1 accepts too many of them.
@@ -170,6 +171,40 @@ def choose_hd_reading(evidence, minimum):
     return chosen, {r: votes[r] for r in HD_READINGS}
 
 
+# How pre-op studies are grouped to choose a reading. "all": one reading for every study (run r1).
+# "native_orientation": one reading per axis-code group (run r2), because run r1 found the release stored flipped
+# for all 30 PIR pre-op scans and unflipped for all 3 LPS ones.
+READING_GROUPINGS = ("all", "native_orientation")
+
+
+def axis_codes(affine):
+    """Axis codes of a header, e.g. ``PIR``: the anatomical direction in which each array index grows."""
+    return "".join(nib.aff2axcodes(affine))
+
+
+def choose_group_readings(evidence, codes, minimum, grouping="all"):
+    """One HD-GLIO-AUTO reading per group of pre-op studies: ``{group: {"chosen", "votes", "studies"}}``.
+
+    ``evidence`` and ``codes`` are keyed by study; ``codes`` holds each study's axis codes. With ``grouping``
+    ``"all"`` every study is in one group named ``all``. With ``"native_orientation"`` the studies are grouped by
+    their axis codes. Each group votes by itself with ``choose_hd_reading``; a group in which no reading reaches
+    ``minimum`` raises, naming the group.
+    """
+    if grouping not in READING_GROUPINGS:
+        raise ValueError(f"Unknown reading grouping {grouping!r}; use one of {READING_GROUPINGS}")
+    members = {}
+    for study, per_reading in evidence.items():
+        members.setdefault("all" if grouping == "all" else codes[study], {})[study] = per_reading
+    groups = {}
+    for group in sorted(members):
+        try:
+            chosen, votes = choose_hd_reading(members[group], minimum)
+        except ValueError as error:
+            raise ValueError(f"orientation group {group}: {error}") from error
+        groups[group] = {"chosen": chosen, "votes": votes, "studies": len(members[group])}
+    return groups
+
+
 # ----------------------------------------------------------------------------------------------------- manifest ----
 
 def _side_entry(root, pair, side, settings):
@@ -291,7 +326,8 @@ def mask_check(manifest, root, settings, *, progress=None):
     """Step 4 on the pairs not yet excluded. Holds patient names: private."""
     cfg, root = settings["mask_check"], Path(root)
     patients = [p for p, e in sorted(manifest["patients"].items()) if not e["exclusion"]]
-    evidence = {}
+    grouping = cfg.get("hdglio_reading_groups", "all")
+    evidence, codes = {}, {}
     for patient in patients:  # which reading of the HD-GLIO-AUTO files puts them on the tumor (native T1ce only)
         files = manifest["patients"][patient]["pre"]["files"]
         ct1, _ = load_xyz(root / files["native_ct1"])
@@ -305,9 +341,19 @@ def mask_check(manifest, root, settings, *, progress=None):
                 flipped = np.flip(flipped, axis) if flip else flipped
             variants[reading] = flipped
         evidence[patient] = reading_evidence(ct1, variants)
-    reading, reading_votes = choose_hd_reading(evidence, cfg["hdglio_reading_agreement_min"])
-    if progress:
-        progress(f"mask check: HD-GLIO-AUTO reading {reading}, votes {reading_votes}")
+        codes[patient] = {"pre": axis_codes(hd_affine)}
+    groups = choose_group_readings(evidence, {p: c["pre"] for p, c in codes.items()},
+                                   cfg["hdglio_reading_agreement_min"], grouping)
+
+    def reading_for(code):
+        group = "all" if grouping == "all" else code
+        return groups[group]["chosen"] if group in groups else None
+
+    if progress and grouping == "all":
+        progress(f"mask check: HD-GLIO-AUTO reading {groups['all']['chosen']}, votes {groups['all']['votes']}")
+    elif progress:
+        progress("mask check: HD-GLIO-AUTO reading by orientation: " + "; ".join(
+            f"{group} {v['chosen']} ({v['votes'][v['chosen']]} of {v['studies']} votes)" for group, v in groups.items()))
     votes, contrasts, stored = Counter(), {}, {}
     for i, patient in enumerate(patients, start=1):
         entry = manifest["patients"][patient]
@@ -315,24 +361,31 @@ def mask_check(manifest, root, settings, *, progress=None):
         for side in ("pre", "post"):
             files = entry[side]["files"]
             dbt, affine = load_xyz(root / files["dbt_atlas_mask"], labels=True)
-            flip = hd_flip_axes(reading, nib.load(str(root / files["hdglio_native_ct1_mask"])).affine)
-            hd = native_mask_in_atlas(root, files, "hdglio_native_ct1_mask", flip)
+            hd_affine = nib.load(str(root / files["hdglio_native_ct1_mask"])).affine
+            codes[patient][side] = axis_codes(hd_affine)
+            reading = reading_for(codes[patient][side])
+            if reading is None and side == "pre":
+                raise ValueError("A pre-op study has no reading: its orientation group is missing")
+            # A post-op study whose orientation no pre-op study has is not read; its numbers are reported as missing.
+            hd = None if reading is None else native_mask_in_atlas(
+                root, files, "hdglio_native_ct1_mask", hd_flip_axes(reading, hd_affine))
             voxel_ml = float(abs(np.linalg.det(affine[:3, :3]))) / 1000.0
             if side == "pre":
                 ct1, _ = load_xyz(root / files["atlas_ct1"])
                 t1, _ = load_xyz(root / files["atlas_t1"])
-                contrasts[patient] = enhancement_by_label(ct1, t1, hd)
+                contrasts[patient] = enhancement_by_label(ct1, t1, hd)  # a pre-op study is always read
                 if len(contrasts[patient]) >= 2:
                     votes[max(contrasts[patient], key=contrasts[patient].get)] += 1
             stored[patient][side] = {
                 "shape": dbt.shape,
                 "voxel_ml": voxel_ml,
+                "reading": reading,
                 "dbt_enhancing": np.packbits(dbt == DBT_ENHANCING),
-                "hd": {v: np.packbits(hd == v) for v in (1, 2)},
+                "hd": None if hd is None else {v: np.packbits(hd == v) for v in (1, 2)},
                 "dbt_core_ml": _ml(np.isin(dbt, DBT_CORE), voxel_ml),
                 "dbt_lesion_centroid": _centroid(dbt > 0),
-                "hd_lesion_centroid": _centroid(hd > 0),
-                "hd_ids": sorted(int(v) for v in np.unique(hd) if v),
+                "hd_lesion_centroid": None if hd is None else _centroid(hd > 0),
+                "hd_ids": None if hd is None else sorted(int(v) for v in np.unique(hd) if v),
             }
         if progress and (i % 6 == 0 or i == len(patients)):
             progress(f"mask check: {i}/{len(patients)}")
@@ -351,14 +404,16 @@ def mask_check(manifest, root, settings, *, progress=None):
         row = {"resection": manifest["patients"][patient]["resection"]}
         for side in ("pre", "post"):
             s = stored[patient][side]
-            dbt_enh, hd_enh = unpack(s, s["dbt_enhancing"]), unpack(s, s["hd"][enhancing_id])
+            dbt_enh = unpack(s, s["dbt_enhancing"])
+            hd_enh = None if s["hd"] is None else unpack(s, s["hd"][enhancing_id])
             row[side] = {
-                "enhancing_dice": _dice_or_none(dbt_enh, hd_enh),
+                "enhancing_dice": None if hd_enh is None else _dice_or_none(dbt_enh, hd_enh),
                 "dbt_enhancing_ml": _ml(dbt_enh, s["voxel_ml"]),
-                "hdglio_enhancing_ml": _ml(hd_enh, s["voxel_ml"]),
+                "hdglio_enhancing_ml": None if hd_enh is None else _ml(hd_enh, s["voxel_ml"]),
                 "dbt_core_ml": s["dbt_core_ml"],
                 "lesion_centroid_distance_mm": _distance(s["dbt_lesion_centroid"], s["hd_lesion_centroid"]),
                 "hdglio_ids": s["hd_ids"],
+                "hdglio_reading": s["reading"],
             }
         pre_dice = row["pre"]["enhancing_dice"]
         row["flagged"] = pre_dice is None or pre_dice < cfg["flag_enhancing_dice_below"]
@@ -377,9 +432,14 @@ def mask_check(manifest, root, settings, *, progress=None):
         "schema": 1,
         "experiment": EXPERIMENT,
         "space": "DeepBraTumIA atlas",
-        "hdglio_reading": {"chosen": reading, "votes": reading_votes, "studies": len(evidence),
+        "hdglio_reading": {"grouping": grouping, "groups": groups,
+                           "chosen": groups["all"]["chosen"] if grouping == "all" else None,
+                           "votes": groups["all"]["votes"] if grouping == "all" else None,
+                           "studies": len(evidence),
                            "evidence_by_patient": evidence,
-                           "basis": "native T1ce robust z in the brightest HD label, per reading; pre-op studies"},
+                           "orientation_by_patient": codes,
+                           "basis": "native T1ce robust z in the brightest HD label, per reading; pre-op studies "
+                                    "vote, post-op studies are read as their group"},
         "hdglio_enhancing_id": int(enhancing_id),
         "hdglio_id_votes": {str(k): v for k, v in sorted(votes.items())},
         "rule": {"flag_enhancing_dice_below": cfg["flag_enhancing_dice_below"],
@@ -553,11 +613,24 @@ def summarize(manifest, mask=None, split=None, control=None, rows=None, failures
            "same_atlas_grid_pairs": sum(e["same_numeric_grid"] for e in patients.values())}
     if mask is not None:
         rows_m = mask["pairs"].values()
-        ev = mask["hdglio_reading"]["evidence_by_patient"].values()
+        read = mask["hdglio_reading"]
+        ev = read["evidence_by_patient"].values()
+        grouped = read.get("grouping", "all") != "all"
+        groups = read.get("groups") or {"all": {key: read[key] for key in ("chosen", "votes", "studies")}}
+        codes = read.get("orientation_by_patient", {}).values()
+        as_read = [read["evidence_by_patient"][p][row["pre"]["hdglio_reading"]]["brightest_label_z"]
+                   for p, row in mask["pairs"].items() if row["pre"].get("hdglio_reading")]
         out["mask_check"] = {
             "pairs": len(mask["pairs"]),
-            "hdglio_reading": mask["hdglio_reading"]["chosen"],
-            "hdglio_reading_votes": mask["hdglio_reading"]["votes"],
+            "hdglio_reading_grouping": read.get("grouping", "all"),
+            "hdglio_reading": {g: v["chosen"] for g, v in groups.items()} if grouped else read["chosen"],
+            "hdglio_reading_votes": {g: v["votes"] for g, v in groups.items()} if grouped else read["votes"],
+            "hdglio_reading_group_studies": {g: v["studies"] for g, v in groups.items()},
+            "orientation_pre": dict(Counter(c["pre"] for c in codes)),
+            "orientation_post": dict(Counter(c["post"] for c in codes if "post" in c)),
+            "post_studies_not_read": sum(
+                "hdglio_reading" in r["post"] and r["post"]["hdglio_reading"] is None for r in rows_m),
+            "hdglio_brightest_label_z_as_read": _spread(as_read),
             "hdglio_brightest_label_z_by_reading": {r: _spread(e[r]["brightest_label_z"] for e in ev) for r in HD_READINGS},
             "hdglio_inside_brain_by_reading": {r: _spread(e[r]["inside_brain"] for e in ev) for r in HD_READINGS},
             "hdglio_enhancing_id": mask["hdglio_enhancing_id"],
@@ -604,6 +677,44 @@ def summarize(manifest, mask=None, split=None, control=None, rows=None, failures
         threshold = settings["gate_a_min_accepted_pairs"]
         out["gate_a"] = {"accepted_pairs": accepted, "threshold": threshold, "passed": accepted >= threshold}
     return out
+
+
+COMPARED_QC = ("far_corr_before", "far_corr_after", "outline_dice_before", "outline_dice_after", "displacement_max_mm")
+
+
+def compare_with_run(manifest, rows, earlier_manifest, earlier_rows):
+    """Counts-only comparison of this run with an earlier run of the same cohort, e.g. r2 with r1.
+
+    ``rows`` and ``earlier_rows`` are registration QC rows as dicts; values may be numbers or CSV text. The patient
+    entries of the two manifests are compared as a whole. The manifests' own copies of the settings are left out:
+    they differ whenever the rule changed.
+    """
+    now = {row["patient"]: row for row in rows}
+    before = {row["patient"]: row for row in earlier_rows}
+    common, only_now = sorted(set(now) & set(before)), sorted(set(now) - set(before))
+
+    def accepted(row):
+        return row["acceptance"] == "accept"
+
+    def largest(column):
+        values = [abs(float(now[p][column]) - float(before[p][column])) for p in common
+                  if now[p][column] not in (None, "") and before[p][column] not in (None, "")]
+        return round(max(values), 6) if values else None
+
+    same_entries = json.loads(json.dumps(manifest["patients"])) == json.loads(json.dumps(earlier_manifest["patients"]))
+    return {
+        "patient_entries_identical": bool(same_entries),
+        "pairs_listed_now_and_earlier": [len(manifest["patients"]), len(earlier_manifest["patients"])],
+        "exported_in_both": len(common),
+        "exported_only_now": len(only_now),
+        "exported_only_earlier": len(set(before) - set(now)),
+        "same_acceptance": sum(accepted(now[p]) == accepted(before[p]) for p in common),
+        "accepted_earlier_not_now": sum(accepted(before[p]) and not accepted(now[p]) for p in common),
+        "accepted_now_not_earlier": sum(accepted(now[p]) and not accepted(before[p]) for p in common),
+        "same_role": sum(now[p]["role"] == before[p]["role"] for p in common),
+        "largest_difference": {column: largest(column) for column in COMPARED_QC},
+        "accepted_among_only_now": sum(accepted(now[p]) for p in only_now),
+    }
 
 
 # -------------------------------------------------------------------------------------------------- whole step ----

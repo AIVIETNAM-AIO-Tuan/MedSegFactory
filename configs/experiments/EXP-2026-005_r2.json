@@ -1,0 +1,46 @@
+{
+  "experiment_id": "EXP-2026-005",
+  "config_version": 2,
+  "note": "Run r2 of the LUMIERE same-week pairs on the atlas route (card steps 2 and 4 to 7). One change from configs/experiments/EXP-2026-005.json (run r1, kept unchanged): mask_check.hdglio_reading_groups. Run r1 read every HD-GLIO-AUTO mask one way; its reading check showed the release stores the masks flipped for PIR scans and unflipped for LPS scans, and that r1 had excluded all 3 LPS pairs for that reason alone. Approved by the researcher on 2026-11-22 as a deviation found after r1. The frame, intensity and registration blocks come unchanged from configs/experiments/EXP-2026-001.json, which is read, never edited.",
+  "route": "atlas",
+  "rigid_tolerance": 0.001,
+  "thick_slice_mm": 2.0,
+  "id_map_dbt_to_rhuh": {"1": 3, "2": 1, "3": 2},
+  "provenance": {
+    "pre_label": "public automated: DeepBraTumIA atlas mask, renumbered to RHUH IDs; not reviewed by an expert",
+    "post_label": "public automated: DeepBraTumIA atlas mask, unverified; used only as a region left out of registration and QC, never as a target"
+  },
+  "foreground": "voxels differing from the border background of DeepBraTumIA's atlas copy, i.e. DeepBraTumIA's own skull stripping (chosen 2026-11-21: on the 4 sample pairs its brain volume changed by at most 3% from pre-op to post-op, against up to 9% for the released HD-BET masks)",
+  "timing": {
+    "tier": "same_week",
+    "hours_stratum": "unknown",
+    "note": "post-op scan in the same week as the pre-op scan; early post-op (<72 h) by the centre's protocol; day not verified"
+  },
+  "licence": "LUMIERE v202211: non-commercial use (dataset paper and readme); CC0 (Figshare record). The stricter terms are followed.",
+  "mask_check": {
+    "space": "DeepBraTumIA atlas",
+    "flag_enhancing_dice_below": 0.5,
+    "hdglio_reading": "HD-GLIO-AUTO native masks are read as stored or flipped along two axes. Pre-op studies that share a native orientation (the axis codes of the mask header) vote together for the reading that puts their brightest label highest on native T1ce; a post-op study is read as its orientation group and does not vote (revised 2026-11-22 for run r2)",
+    "hdglio_reading_groups": "native_orientation",
+    "hdglio_reading_agreement_min": 0.9,
+    "hdglio_id_agreement_min": 0.9,
+    "control_pass_fraction_max": 0.25,
+    "seed": 2026
+  },
+  "split": {
+    "seed": 2026,
+    "development_fraction": 0.2,
+    "strata": "expert rating: complete or partial resection",
+    "pinned_to_train": "the 4 pairs chosen by rhuh_synthesis.lumiere_pairs.choose_sample(eligible pairs, seed=2026), used for local development"
+  },
+  "acceptance": {
+    "rule": {"far_correlation_after_min": 0.5, "outline_dice_after_min": 0.93},
+    "source": "data/RHUH-GBM/synthesis/EXP-2026-001/registration_policy/acceptance_policy_v1.json (frozen 2026-11-03)",
+    "source_sha256_canonical_json": "ce5d6b4a72357079a40628ddda3aec2428afda35148a58a283e88de5260a3a46",
+    "source_sha256_file_bytes": "bbcbf543f0938758e99a7fac95bf9c5710de7acca0622a47ab418207f7b8d301",
+    "applied": "automatically in both roles; a flagged pair is quarantined and kept in the denominator; no case is rescued by looking at it"
+  },
+  "registration_control": {"seed": 2026, "accepted_fraction_max": 0.25},
+  "crop": {"crop_mm": 192, "out_px": 512},
+  "gate_a_min_accepted_pairs": 24
+}

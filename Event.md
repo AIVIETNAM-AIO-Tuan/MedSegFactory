@@ -1001,3 +1001,15 @@ The researcher ran `notebooks/LUMIERE_Colab_reading_check.ipynb` (commit 755ef7d
 
 Consequence: r1's 27 accepted pairs stand, but r1 dropped every LPS scan. Proposed to the researcher, not started: a
 new run with a reading chosen per orientation group. The 0.5 threshold stays as approved.
+
+## 2026-11-22 - EXP-2026-005 run r2 approved: one HD-GLIO-AUTO reading per orientation group
+
+The researcher approved a new run with a revised reading rule ("follow the new rule r2"). It is a deviation found
+after run r1.
+
+- Rule: pre-op studies vote within their native-orientation group; each group needs 90% agreement or the run stops.
+  A post-op study is read as its group and does not vote.
+- Unchanged: the 0.5 flag rule, both controls, the split rule and seed, the pinned patients, the registration and
+  acceptance rule v1.
+- r2 replaces r1's mask check, split and exports before anything has used them. r1's records stay on Drive.
+- Config `configs/experiments/EXP-2026-005_r2.json`; r1's config file is not edited.

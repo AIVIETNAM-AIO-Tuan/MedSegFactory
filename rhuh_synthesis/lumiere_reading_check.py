@@ -116,6 +116,8 @@ def reading_diagnostic(root, manifest, mask, *, progress=None):
     """Counts and lettered rows about r1's HD-GLIO-AUTO reading; see the module docstring. Reads, never writes."""
     started, root = time.time(), Path(root)
     say = progress or (lambda *_: None)
+    if mask["hdglio_reading"].get("grouping", "all") != "all":
+        raise ValueError("This check is for a run that read every study one way (run r1), not for a grouped reading")
     chosen = mask["hdglio_reading"]["chosen"]
     enhancing_id = int(mask["hdglio_enhancing_id"])
     threshold = mask["rule"]["flag_enhancing_dice_below"]
