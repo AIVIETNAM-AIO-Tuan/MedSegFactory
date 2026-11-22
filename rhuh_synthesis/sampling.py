@@ -312,7 +312,15 @@ def decode_pair(vae, image_latents, mask_latents, *, mask_codec="scalar_id_over_
         raise ValueError(f"Unknown mask codec {mask_codec!r}")
     scale = float(vae.config.scaling_factor)
     dtype = next(vae.parameters()).dtype
-    images = vae.decode(image_latents.to(dtype) / scale).sample.float()
-    images = ((images / 2.0 + 0.5).clamp(0.0, 1.0)).mean(dim=1).cpu().numpy()
+    images = decode_images(vae, image_latents)
     masks = vae.decode(mask_latents.to(dtype) / scale).sample.float().cpu().numpy()
-    return images.astype("float32"), MASK_CODECS[mask_codec][1](masks)
+    return images, MASK_CODECS[mask_codec][1](masks)
+
+
+@torch.no_grad()
+def decode_images(vae, image_latents):
+    """Decode image latents to ``[B, H, W]`` float32 in [0, 1], as ``decode_pair`` does for its images."""
+    scale = float(vae.config.scaling_factor)
+    dtype = next(vae.parameters()).dtype
+    images = vae.decode(image_latents.to(dtype) / scale).sample.float()
+    return ((images / 2.0 + 0.5).clamp(0.0, 1.0)).mean(dim=1).cpu().numpy().astype("float32")

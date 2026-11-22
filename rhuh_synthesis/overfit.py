@@ -651,30 +651,34 @@ def stage4_decision(training_log, steps, first, final, shuffled, criteria):
 MASK_COLORS = ("black", "gold", "limegreen", "red")  # IDs 0, 1, 2, 3
 
 
-def save_overfit_grid(path, rows, *, title, panel_inches=4.0, dpi=128):
+GRID_COLUMNS = (("pre-op", "pre_image"), ("post-op target", "post_image"), ("generated", "generated_image"),
+                ("target mask", "label"), ("generated mask", "generated_mask"))
+GRID_MASK_KEYS = ("label", "generated_mask")
+
+
+def save_overfit_grid(path, rows, *, title, panel_inches=4.0, dpi=128, columns=GRID_COLUMNS, mask_keys=GRID_MASK_KEYS):
     """PNG of pre-op, target, generated MRI and target/generated masks, one row per slice.
 
     ``rows`` are dicts with ``name``, the five 2D arrays ``pre_image``,
     ``post_image``, ``generated_image``, ``label``, ``generated_mask`` and
     optionally ``caption`` (for example the row's text prompts), printed above
     the row. Each panel is ``panel_inches`` wide at ``dpi`` (the defaults
-    show a 512 px slice at its native size). The figure shows patient images:
-    keep it in the private run directory.
+    show a 512 px slice at its native size). ``columns`` (heading, key) and
+    ``mask_keys`` (keys drawn as label maps) change the panels; the defaults are
+    the five above. The figure shows patient images: keep it in the private run
+    directory.
     """
     from pathlib import Path
 
     from matplotlib.colors import ListedColormap
     from matplotlib.figure import Figure
-
-    columns = (("pre-op", "pre_image"), ("post-op target", "post_image"), ("generated", "generated_image"),
-               ("target mask", "label"), ("generated mask", "generated_mask"))
     labels = ListedColormap(MASK_COLORS)
     row_inches = panel_inches + 0.8
     figure = Figure(figsize=(panel_inches * len(columns), row_inches * len(rows) + 0.5), layout="constrained")
     for subfigure, row in zip(np.atleast_1d(figure.subfigures(len(rows), 1)), rows):
         axes = subfigure.subplots(1, len(columns))
         for ax, (heading, key) in zip(axes, columns):
-            if key in ("label", "generated_mask"):
+            if key in mask_keys:
                 ax.imshow(row[key], cmap=labels, vmin=0, vmax=3, origin="lower", interpolation="nearest")
             else:
                 ax.imshow(row[key], cmap="gray", vmin=0, vmax=1, origin="lower", interpolation="nearest")

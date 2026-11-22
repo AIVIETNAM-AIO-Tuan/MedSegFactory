@@ -567,3 +567,13 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   passed. Three new deliberate faults were each caught. Without `edit`, the sampler is bit-identical to the previous
   commit in 12 of 12 configurations.
 - Next: the D2 module and notebook (started).
+
+## 2026-11-22 - EXP-2026-008 D2 implemented
+
+- `rhuh_synthesis/localized_wiring.py`, `configs/experiments/EXP-2026-008_d2.json`,
+  `notebooks/RHUH_GBM_Colab_d2_wiring.ipynb`. Shared additions with unchanged defaults: `sampling.decode_images`,
+  and optional columns in `overfit.save_overfit_grid`.
+- Tests (local only): `test_localized_wiring.py` 11 passed. In an end-to-end CPU run Gate D passed with exact zeros,
+  and the decision was ITERATE on the random tiny model. Two deliberate faults were each caught. Wide suite: 378 passed (synthesis, LUMIERE, scaffold, D1, D2, Colab-package and rhuh_qc test files); in the main tree, Codex's sampler-using tests 147 passed.
+- Next: the researcher runs the D2 notebook on a Colab GPU and sends the summary. The LUMIERE part of C4 is the next
+  CPU item.

@@ -1082,3 +1082,14 @@ after run r1.
   composition raises on a non-finite value inside E.
 - Plan: rules for support, empty regions and denominators; the start rule compares the output with the round trip;
   only the recipe W4 and W7 can veto PROMOTE; enhancing volume outside K is reported.
+
+## 2026-11-22 - EXP-2026-008 D2 implemented; ready for the researcher's GPU run
+
+- Module `rhuh_synthesis/localized_wiring.py`, config `configs/experiments/EXP-2026-008_d2.json` and notebook
+  `notebooks/RHUH_GBM_Colab_d2_wiring.ipynb` implement the card as revised after the two reviews. Arms W0 to W7 with
+  W1r, W4g and W6e; seeds 11, 22 and 33; the empty-region, full-region and repeat checks; the frozen readouts and the
+  decision rule.
+- The patient is chosen by the frozen rule. On the laptop the rule gives the case the card names: 7 accepted
+  development cases, the median with a 36.6-ml core.
+- Nothing has run on the GPU. The CPU tests check the wiring with tiny random models and say nothing about the r2
+  model.

@@ -1,0 +1,47 @@
+{
+  "experiment_id": "EXP-2026-008",
+  "part": "D2",
+  "config_version": 1,
+  "note": "One-patient wiring test of the localized sampler on the frozen r2 weights. Frozen with the card on 2026-11-22 after two reviews by Codex; experiments/registry/EXP-2026-008.md holds the design and the frozen evaluation. The representation, sampling, text and evaluation blocks of configs/experiments/EXP-2026-001.json are used as frozen.",
+  "weights": {"stage5_run_tag": "r2", "record": "record.json"},
+  "patient_rule": "the accepted RHUH development case (pinned to training) with the median pre-op core volume (IDs 1 and 3); lower median, ties by patient ID",
+  "slab": {"slices": 12, "rule": "contiguous axial slices with the largest summed pre-op core area; ties go to the lowest start"},
+  "seeds": [11, 22, 33],
+  "repeat_seed": 11,
+  "grid_seed": 11,
+  "grid_slices": 4,
+  "batch_pairs": 6,
+  "residual_scenario": {"n_pieces": 2, "volume_ml": 0.8, "seed": 2026, "seed_region": "slab"},
+  "starts": {"main": 501, "contrast": 981, "follow_up": 701},
+  "arms": {
+    "W0": {"sampler": "none", "image": "copy", "mask": "pre_op", "scenario": "none"},
+    "W1": {"sampler": "none", "image": "scaffold", "mask": "start_empty", "scenario": "none"},
+    "W1r": {"sampler": "none", "image": "residual_scaffold", "mask": "start_pieces", "scenario": "residual"},
+    "W2": {"sampler": "plain", "image": "scaffold", "mask": "start_empty", "scenario": "none"},
+    "W3": {"sampler": "localized", "image": "scaffold", "t_start": "contrast", "mask_stream": "free", "mask": "start_empty", "scenario": "none"},
+    "W4": {"sampler": "localized", "image": "scaffold", "t_start": "main", "mask_stream": "free", "mask": "start_empty", "scenario": "none"},
+    "W4g": {"sampler": "whole_slice", "image": "scaffold", "t_start": "main", "mask_stream": "free", "mask": "start_empty", "scenario": "none"},
+    "W5": {"sampler": "localized", "image": "scaffold", "t_start": "main", "mask_stream": "free", "mask": "pre_op", "scenario": "none"},
+    "W6": {"sampler": "localized", "image": "residual_scaffold", "t_start": "main", "mask_stream": "fixed", "mask": "start_pieces", "scenario": "residual"},
+    "W6e": {"sampler": "localized", "image": "residual_scaffold", "t_start": "main", "mask_stream": "fixed", "mask": "start_empty", "scenario": "residual"},
+    "W7": {"sampler": "localized", "image": "residual_scaffold", "t_start": "main", "mask_stream": "free", "mask": "start_pieces", "scenario": "residual"}
+  },
+  "arm_notes": {
+    "image": "the start image, which is also the composition source and the source the anchoring follows; W2 starts from noise and is composed with the scaffold",
+    "mask": "the mask start: for free arms the anchoring source of the mask stream, for fixed arms the fixed mask; W0 and the scaffolds report it as their mask",
+    "prompts": "supplied-scenario prompts of the arm's scenario; W6e uses the residual prompts of W6"
+  },
+  "recipe_arms": ["W4", "W7"],
+  "guardrail_arm": "W4",
+  "guardrail_reported_arms": ["W3", "W5"],
+  "tolerances": {
+    "identity_outside_e": 1e-6,
+    "repeat_image": 1e-4,
+    "repeat_label_voxels": 10,
+    "guardrail_ml": 0.01,
+    "guardrail_min_seeds": 2,
+    "ratio_flag": 2.0,
+    "denominator_floor": 0.001,
+    "control_min_distance_mm": 3.0
+  }
+}
