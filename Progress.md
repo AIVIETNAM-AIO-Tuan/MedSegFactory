@@ -558,3 +558,12 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - Tests (local only): `test_localized_sampling.py` 19 passed; `test_scaffold_check.py` 5 passed; with
   `test_synthesis_model.py` and `test_scaffold.py`, 53 passed. Two new deliberate faults were each caught.
 - Next: the researcher and Codex look at the revised card; then the D2 notebook. The LUMIERE part of C4 can run.
+
+## 2026-11-22 - EXP-2026-008 second review built in
+
+- `rhuh_synthesis/model.py` (`scheduler_mismatches`), `sampling.py` (frozen configuration, finite inputs and
+  outputs), `scaffold.py` (`compose_edit` raises on a non-finite value inside E). The card is revised.
+- Tests (local only): `test_localized_sampling.py` 28 passed; with the model, scaffold and scaffold-check tests, 62
+  passed. Three new deliberate faults were each caught. Without `edit`, the sampler is bit-identical to the previous
+  commit in 12 of 12 configurations.
+- Next: the D2 module and notebook (started).

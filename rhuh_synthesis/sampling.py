@@ -41,7 +41,9 @@ the sampler runs exactly as described above.
   noisier image row also occurs in training; this justifies testing the fixed mask, not its effect. The scheduler
   still takes one joint step on both streams, and the mask rows are then reset. The returned mask is the clean
   source mask latent.
-- Localized editing runs with ``DDIMScheduler`` only, the scheduler it is tested with.
+- Localized editing runs with the frozen DDIM configuration only (``model.reference_ddim_scheduler``, epsilon
+  prediction), the configuration it is tested with. Its source latents and base noise must be finite floating-point
+  tensors, and non-finite output latents stop the run, so that the final composition cannot hide them.
 """
 
 import inspect
@@ -53,7 +55,7 @@ import torch
 from diffusers import DDIMScheduler
 from diffusers.utils.torch_utils import randn_tensor
 
-from .model import _check_generator, _check_unet_io, stack_unet_input
+from .model import _check_generator, _check_unet_io, scheduler_mismatches, stack_unet_input
 
 __all__ = ["LocalizedEdit", "latent_support", "sample_pairs"]
 
@@ -112,6 +114,10 @@ def _checked_edit(edit, shape, device, dtype):
     for name in ("image_region", "mask_region"):
         if getattr(edit, name).dtype != torch.bool:
             raise ValueError(f"edit.{name} must be boolean")
+    for name in ("source_image", "source_mask", "base_noise"):
+        tensor = getattr(edit, name)
+        if not tensor.is_floating_point() or not bool(torch.isfinite(tensor).all()):
+            raise ValueError(f"edit.{name} must be a finite floating-point tensor")
     return {
         "source_image": edit.source_image.to(device=device, dtype=dtype),
         "source_mask": edit.source_mask.to(device=device, dtype=dtype),
@@ -213,7 +219,10 @@ def sample_pairs(
         if initial_latents is not None:
             raise ValueError("Pass either initial_latents or edit, not both")
         if not isinstance(scheduler, DDIMScheduler):
-            raise ValueError("Localized editing is tested with DDIMScheduler only")
+            raise ValueError("Localized editing runs with the frozen DDIMScheduler only")
+        mismatches = scheduler_mismatches(scheduler)
+        if mismatches:
+            raise ValueError(f"Localized editing runs with the frozen DDIM configuration only; differs in {mismatches}")
         local = _checked_edit(edit, (batch, latent_channels, height, width), device, dtype)
         timesteps = timesteps[_start_index(timesteps, edit.t_start):]
         source = torch.cat([local["source_image"], local["source_mask"]], dim=0)
@@ -272,6 +281,8 @@ def sample_pairs(
             mask_latents = local["source_mask"]
         else:
             mask_latents = torch.where(local["mask_region"], mask_latents, local["source_mask"])
+        if not (bool(torch.isfinite(image_latents).all()) and bool(torch.isfinite(mask_latents).all())):
+            raise FloatingPointError("Localized sampling produced non-finite latents")
     return image_latents, mask_latents
 
 

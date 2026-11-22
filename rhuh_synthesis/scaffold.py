@@ -223,7 +223,8 @@ def compose_edit(decoded_image, scaffold, weight, decoded_mask, start, mask_regi
     """D1: final composition of a localized edit, on arrays that share one grid. Returns ``(image, mask)``.
 
     - Image: ``weight * decoded + (1 - weight) * scaffold`` where ``weight > 0``, and exactly ``scaffold`` elsewhere,
-      that is outside E. Pass ``edit_weight``, not the scaffold's weight.
+      that is outside E. Pass ``edit_weight``, not the scaffold's weight. A non-finite decoded value inside E raises;
+      outside E it is ignored (for example a voxel outside the crop's coverage).
     - Mask: the decoded mask inside ``mask_region`` (M) and ``start`` outside it. With ``fixed_mask``, ``start`` (the
       scenario mask) everywhere.
     """
@@ -236,6 +237,8 @@ def compose_edit(decoded_image, scaffold, weight, decoded_mask, start, mask_regi
         raise ValueError("compose_edit needs arrays of one shape")
     if weight.size and (weight.min() < 0 or weight.max() > 1):
         raise ValueError("weight must lie in [0, 1]")
+    if not np.isfinite(decoded_image[weight > 0]).all():
+        raise ValueError("The decoded image is not finite inside E")
     blend = weight * decoded_image + (1.0 - weight) * scaffold
     image = np.where(weight > 0, blend, scaffold).astype(np.float32)
     mask = start.copy() if fixed_mask else np.where(mask_region, decoded_mask, start).astype(start.dtype)

@@ -40,6 +40,7 @@ __all__ = [
     "expand_conv_in",
     "mask_fractions",
     "reference_ddim_scheduler",
+    "scheduler_mismatches",
     "stack_unet_input",
     "training_loss",
 ]
@@ -316,6 +317,17 @@ def reference_ddim_scheduler():
         set_alpha_to_one=False,
         steps_offset=1,
     )
+
+
+def scheduler_mismatches(scheduler):
+    """Config entries in which ``scheduler`` differs from ``reference_ddim_scheduler()``; empty if it matches.
+
+    Bookkeeping entries (names starting with ``_``) are ignored. A scheduler without a config differs everywhere.
+    """
+    reference = reference_ddim_scheduler().config
+    config = getattr(scheduler, "config", None) or {}
+    return sorted(key for key, value in reference.items()
+                  if not key.startswith("_") and (key not in config or config[key] != value))
 
 
 def _check_generator(generator):

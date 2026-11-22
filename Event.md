@@ -1067,3 +1067,18 @@ after run r1.
 - Code: the fixed mask rows are noised to timestep 0 as in training; localized editing runs with DDIM only; the C4
   entrypoint requires the frozen training allowlist. The C4 record is unchanged.
 - Budget: 8 neural arms instead of 6.
+
+## 2026-11-22 - EXP-2026-008 second review (C12 to C16): all verified and built into the plan
+
+- Codex's second review reproduced the D1 tests independently: 65 and 14 passed (audit
+  `codex_d1_cpu_20261122_96b752a2`). Its negative probes found two gaps: a DDIM scheduler set to velocity prediction
+  was accepted, and NaN inputs spread silently to both streams. Its other findings concerned the readout contract
+  (support, empty regions, ratio denominators), the VAE round trip (a reference, not a lower bound) and which arms
+  can veto readiness.
+- The researcher asked Claude to verify each finding, correct the plan where it is true and erase it where it is
+  false, and then implement D2 without asking again. All five held, and none was erased. The card carries them as
+  plan text; the comment lines are removed.
+- Code: localized editing requires the frozen DDIM configuration and finite inputs; non-finite outputs raise; the
+  composition raises on a non-finite value inside E.
+- Plan: rules for support, empty regions and denominators; the start rule compares the output with the round trip;
+  only the recipe W4 and W7 can veto PROMOTE; enhancing volume outside K is reported.
