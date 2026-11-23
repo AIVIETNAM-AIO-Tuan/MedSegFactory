@@ -606,3 +606,11 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - The D2 notebook saved at 11:02 holds d2_r3's outputs unchanged (only its execution counters were cleared): no new
   run.
 - Next: the researcher runs the C4 notebook and sends the SUMMARY; then the training series' card (EXP-2026-007).
+
+## 2026-11-23 - C4 on LUMIERE done (c4_lumiere_v1)
+
+- Gain 0.0174 (0.0100 to 0.0256), 21 of 25 lower. CRET 0.0171 (15 of 19); PRET about 0.018 (6 of 6). Every check
+  exact (no change outside E, 25 of 25 repeats identical).
+- The notebook with its outputs is kept privately in `data/LUMIERE/EXP-2026-008/`.
+- Next: the training series' card (EXP-2026-007). Optional before it: read the 4 losing pairs in the private record
+  (download `c4_lumiere_v1.json` from Drive; no new run).

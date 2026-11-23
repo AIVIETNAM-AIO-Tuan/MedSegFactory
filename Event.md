@@ -1141,3 +1141,12 @@ after run r1.
   - Gate C stays frozen on RHUH. On LUMIERE the same rule is reported and decides nothing.
 - The C4 summary moved into `scaffold.c4_summary`. From the patient rows saved in `c4_rhuh_v1` it gives the saved
   summary exactly.
+
+## 2026-11-23 - EXP-2026-008 C4 on LUMIERE (c4_lumiere_v1): the scaffold beats a copy outside RHUH, by less
+
+- The researcher ran the C4 notebook on Colab (CPU, commit df304e6, 1,272 s). The record is confirmed by MD5 on Drive.
+- On r2's 25 accepted training-role pairs (19 CRET, 6 PRET), the scaffold's mean primary-MAE gain over a copy is 0.0174
+  (95% patient bootstrap 0.0100 to 0.0256), lower in 21 of 25. The same rule as Gate C holds; it decides nothing.
+- The gain is about two-thirds of RHUH's 0.0271. The difference between the datasets is not established (p about 0.1,
+  not planned). All 4 losses are CRET pairs, and their cause is not checked.
+- For the training series' card: the scaffold transfers as a start on average, with more failures than on RHUH.
