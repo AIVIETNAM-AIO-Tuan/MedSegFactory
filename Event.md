@@ -1150,3 +1150,12 @@ after run r1.
 - The gain is about two-thirds of RHUH's 0.0271. The difference between the datasets is not established (p about 0.1,
   not planned). All 4 losses are CRET pairs, and their cause is not checked.
 - For the training series' card: the scaffold transfers as a start on average, with more failures than on RHUH.
+
+## 2026-11-23 - EXP-2026-008 C4 follow-up: the region split; RHUH's gain comes from the enhancing rim
+
+- The researcher asked to check the 4 LUMIERE pairs where the scaffold loses before the training series' card.
+- The scaffold equals the copy outside E, so each patient's score difference splits exactly into the pre-op core's
+  ID 1 (K1), its ID 3 (K3) and the band. The reading was fixed in the card before any number was computed.
+- RHUH (24 training patients, laptop): the gain comes from K3 (median -0.021 without residual). K1 adds almost
+  nothing, because RHUH's necrosis is already as dark as the fill before surgery.
+- The LUMIERE notebook is ready (`notebooks/LUMIERE_Colab_c4_regions.ipynb`).

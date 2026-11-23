@@ -18,8 +18,9 @@ The cohort is enforced positively, from run r2's own records:
 
 Scores are against the real post-op scan, so they are target-informed. These pairs never trained the r2 weights and
 did not shape the scaffold, so this is the scaffold's first check outside RHUH. Gate C stays frozen on RHUH; here the
-same rule is reported and decides nothing. Records hold patient names: keep them private. Messages and the summary
-name no patient.
+same rule is reported and decides nothing. ``run_region_check`` is the follow-up: where, by region of the pre-op core,
+the fill gains or loses (``scaffold_regions``). Records hold patient names: keep them private. Messages, summaries
+and tables name no patient.
 """
 
 import csv
@@ -33,6 +34,7 @@ import numpy as np
 from .manifest import canonical_json, write_once_json
 from .provenance import code_version, config_sha256, environment
 from .scaffold import c4_summary, check_patient, primary_mae_na
+from .scaffold_regions import region_diagnostics, region_summary, region_table
 
 RESIDUAL_BY_RATING = {"complete": False, "partial": True}  # CRET, PRET
 CHECK = ("C4 on LUMIERE training-role pairs, no-residual scenario, target-informed scores; "
@@ -171,5 +173,67 @@ def run_c4_lumiere(run_dir, config, out_path, *, source_run, expected, repo_root
     return summary, path, digest
 
 
+QC_COLUMNS = (("far corr", "far_corr_after", "{:.3f}"), ("outline", "outline_dice_after", "{:.3f}"))
+
+
+def _lowest_first_ranks(rows, key, members):
+    """Ranks (1 = lowest value of ``key`` among ``rows``) of the rows in ``members``, matched by identity."""
+    order = sorted(range(len(rows)), key=lambda i: rows[i][key])
+    rank = {i: position + 1 for position, i in enumerate(order)}
+    chosen = {id(r) for r in members}
+    return sorted(rank[i] for i in range(len(rows)) if id(rows[i]) in chosen)
+
+
+def run_region_check(run_dir, config, c4_record, out_path, *, source_run, expected, repo_root, progress=None):
+    """C4 follow-up on LUMIERE: the region split (``scaffold_regions``) of every accepted training-role pair.
+
+    Same cohort checks as ``run_c4_lumiere``. ``c4_record`` is that function's record for the same split: each pair's
+    split must reproduce its C4 difference within 1e-4. Adds the source run's registration QC. Writes one write-once
+    record (it names patients); returns ``(summary, table, path, sha256)``, both without names.
+    """
+    split, split_sha256, _ = verified_split(run_dir)
+    pairs, counts = accepted_training_pairs(run_dir, split, split_sha256)
+    if len(pairs) != expected:
+        raise ValueError(f"{len(pairs)} accepted training-role pairs, expected {expected}")
+    if c4_record["source"]["split_sha256"] != split_sha256:
+        raise ValueError("The C4 record belongs to another split")
+    c4 = c4_record["patients"]
+    if {sidecar["patient"] for _, sidecar in pairs} != set(c4):
+        raise ValueError("The C4 record's pairs differ from the accepted pairs")
+    qc = read_qc(Path(run_dir) / "registration_qc.csv")
+    rows = {}
+    for i, (path, sidecar) in enumerate(pairs, start=1):
+        with np.load(path) as data:
+            arrays = {key: data[key] for key in data.files}
+        if "label" in arrays:
+            raise ValueError("A LUMIERE export holds a 'label' key; its post-op labels are unverified and are not read")
+        row = region_diagnostics(arrays, config["evaluation"])
+        scores = c4[sidecar["patient"]]
+        recorded = scores["scaffold"]["primary_mae"] - scores["copy"]["primary_mae"]
+        if row["na_reason"] or abs(row["delta"] - recorded) > 1e-4 or abs(row["outside_e_contribution"]) > 1e-9:
+            raise ValueError(f"pair {i}: the region split does not reproduce its C4 difference")
+        row["status"] = sidecar["resection"]
+        for _, key, _ in QC_COLUMNS:
+            row[key] = float(qc[sidecar["patient"]][key])
+        rows[sidecar["patient"]] = row
+        if progress:
+            progress(f"pair {i}/{len(pairs)} split")
+    values = list(rows.values())
+    worse = [r for r in values if r["delta"] > 0]
+    summary = {"check": "C4 follow-up on LUMIERE: region split of the scaffold-minus-copy primary MAE",
+               "source": {"run": source_run, "split_sha256": split_sha256[:12]}, "cohort": counts,
+               "ratings_of_worse_pairs": dict(sorted(Counter(r["status"] for r in worse).items())),
+               **region_summary(values)}
+    summary["registration_qc_ranks_of_worse_pairs_lowest_first"] = {
+        key: _lowest_first_ranks(values, key, worse) for _, key, _ in QC_COLUMNS}
+    table = region_table(values, extra=QC_COLUMNS)
+    record = {"summary": summary, "patients": rows, "code": code_version(repo_root), "environment": environment(),
+              "config_sha256": {"EXP-2026-001": config_sha256(config)},
+              "source": {"run": source_run, "split_sha256": split_sha256},
+              "c4_record_summary_source": c4_record["summary"].get("source")}
+    path, digest = write_once_json(out_path, record)
+    return summary, table, path, digest
+
+
 __all__ = ["RESIDUAL_BY_RATING", "accepted_training_pairs", "check_pair", "file_sha256", "read_qc",
-           "run_c4_lumiere", "summarize", "verified_split"]
+           "run_c4_lumiere", "run_region_check", "summarize", "verified_split"]

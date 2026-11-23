@@ -614,3 +614,11 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - The notebook with its outputs is kept privately in `data/LUMIERE/EXP-2026-008/`.
 - Next: the training series' card (EXP-2026-007). Optional before it: read the 4 losing pairs in the private record
   (download `c4_lumiere_v1.json` from Drive; no new run).
+
+## 2026-11-23 - C4 region split: RHUH done, LUMIERE notebook ready
+
+- `rhuh_synthesis/scaffold_regions.py`, `run_region_check`, `scripts/scaffold_region_check.py` and the notebook. Tests:
+  4 + 3 new passed, 40 with the scaffold tests; 6 of 6 mutations caught.
+- RHUH run `c4_rhuh_regions_v1`: 24 of 24 splits reproduce C4. The fill gains on the enhancing rim (K3).
+- Next: the researcher runs the region notebook (CPU, about 5 to 10 minutes) and sends the SUMMARY and the TABLE;
+  then the training series' card.
