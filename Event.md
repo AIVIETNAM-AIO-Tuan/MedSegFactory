@@ -1129,3 +1129,15 @@ after run r1.
   - The free mask keeps 17 to 40% of the pieces.
   - Anchoring keeps raw drift outside E at 1.04 times the VAE's own error, against 3.7 without anchoring.
   - No arm beats the scaffold on the primary MAE against the real scan (0.121; W4 0.125 to 0.131).
+
+## 2026-11-23 - EXP-2026-008 C4 on LUMIERE implemented; residual status from the expert rating
+
+- The researcher asked for the LUMIERE C4 notebook. `rhuh_synthesis/lumiere_scaffold_check.py` and
+  `notebooks/LUMIERE_Colab_c4_scaffold.ipynb` run RHUH's per-pair check and summary on run r2's 25 accepted
+  training-role pairs.
+- Decided at implementation, before any LUMIERE pair was scored, and written into the card:
+  - Whether the real post-op scan holds residual tumor, which only splits the summary, comes from the expert rating
+    (CRET none, PRET some). No post-op voxel label is read.
+  - Gate C stays frozen on RHUH. On LUMIERE the same rule is reported and decides nothing.
+- The C4 summary moved into `scaffold.c4_summary`. From the patient rows saved in `c4_rhuh_v1` it gives the saved
+  summary exactly.

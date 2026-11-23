@@ -595,3 +595,14 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - Every Gate D check was exact. The numbers match d2_r2 to 0.0001 (W2 identical), so the fix changed nothing of
   substance. Item 9 INCONCLUSIVE. Summary saved privately in `data/RHUH-GBM/synthesis/EXP-2026-008/`.
 - Next: the LUMIERE part of C4 (CPU); then the training series' card (EXP-2026-007), starting from D2's findings.
+
+## 2026-11-23 - C4 on LUMIERE ready for Colab
+
+- New: `rhuh_synthesis/lumiere_scaffold_check.py` and `notebooks/LUMIERE_Colab_c4_scaffold.ipynb` (CPU runtime;
+  reads EXP-2026-005 r2 by ID; writes `MyDrive/LUMIERE_derived/EXP-2026-008/c4_lumiere_v1`).
+- Tests (local only): 18 new, passed, and 8 of 8 mutations caught; 75 passed with the scaffold, wiring and sampling
+  tests.
+- Smoke run of the notebook's cells on the laptop's 3-pair sample: about 43 s per pair, no development file read.
+- The D2 notebook saved at 11:02 holds d2_r3's outputs unchanged (only its execution counters were cleared): no new
+  run.
+- Next: the researcher runs the C4 notebook and sends the SUMMARY; then the training series' card (EXP-2026-007).

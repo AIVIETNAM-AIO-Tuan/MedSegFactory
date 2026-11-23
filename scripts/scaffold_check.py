@@ -18,10 +18,9 @@ import numpy as np
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from rhuh_synthesis.evaluation import paired_bootstrap_ci  # noqa: E402
 from rhuh_synthesis.manifest import write_once_json  # noqa: E402
 from rhuh_synthesis.provenance import code_version, config_sha256  # noqa: E402
-from rhuh_synthesis.scaffold import check_patient  # noqa: E402
+from rhuh_synthesis.scaffold import c4_summary, check_patient, primary_mae_na  # noqa: E402
 
 PRIVATE = REPO / "data" / "RHUH-GBM" / "synthesis"
 
@@ -53,20 +52,6 @@ def training_exports(export_root, policy, split):
     return accepted
 
 
-def spread(values):
-    values = np.asarray(values, float)
-    return {"n": int(values.size), "median": round(float(np.median(values)), 4),
-            "min": round(float(values.min()), 4), "max": round(float(values.max()), 4)}
-
-
-def gain(rows, arm, bootstrap):
-    deltas = [r["copy"]["primary_mae"] - r[arm]["primary_mae"] for r in rows]
-    ci = paired_bootstrap_ci(deltas, resamples=bootstrap["resamples"], seed=bootstrap["seed"],
-                             confidence=bootstrap["confidence"])
-    return {"mean_gain_over_copy": round(ci["mean"], 4), "ci95": [round(ci["low"], 4), round(ci["high"], 4)],
-            "n": ci["n"], "lower_than_copy": int(sum(d > 0 for d in deltas))}
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=REPO / "configs/experiments/EXP-2026-001.json")
@@ -93,32 +78,10 @@ def main():
         patients[path.stem] = check_patient(arrays, evaluation)
         print(f"patient {i}/{len(paths)} checked", flush=True)
     rows = list(patients.values())
-    na = {arm: sum(r[arm]["primary_mae_na_reason"] != "" for r in rows) for arm in ("copy", "scaffold", "legacy")}
+    na = primary_mae_na(rows)
     if any(na.values()):
         sys.exit(f"NA primary MAE: {na}; count them explicitly before any summary")
-    no_residual = [r for r in rows if not r["target_has_residual"]]
-    bootstrap = evaluation["bootstrap"]
-    summary = {
-        "experiment": "EXP-2026-008", "check": "C4 on RHUH, no-residual scenario, target-informed scores",
-        "patients": len(rows), "no_residual_patients": len(no_residual),
-        "primary_mae": {arm: spread([r[arm]["primary_mae"] for r in rows]) for arm in ("copy", "scaffold", "legacy")},
-        "scaffold": gain(rows, "scaffold", bootstrap),
-        "scaffold_no_residual": gain(no_residual, "scaffold", bootstrap),
-        "legacy_2026_11_17_recipe": gain(rows, "legacy", bootstrap),
-        "scaffold_minus_legacy_primary_mae": spread([r["scaffold"]["primary_mae"] - r["legacy"]["primary_mae"] for r in rows]),
-        "stable_mae_change_scaffold_minus_copy_max": round(max(r["scaffold"]["stable_mae"] - r["copy"]["stable_mae"] for r in rows), 6),
-        "outside_edit_region_max_change": max(r["outside_edit_region_max_change"] for r in rows),
-        "repeat_identical": sum(r["repeat_identical"] for r in rows),
-        "core_ml": spread([r["core_ml"] for r in rows]),
-        "residual_scenario_seed_2026": {
-            "pieces": spread([r["residual_scenario"]["pieces"] for r in rows]),
-            "achieved_ml": spread([r["residual_scenario"]["achieved_ml"] for r in rows]),
-            "reached_target": sum(r["residual_scenario"]["reached_target"] for r in rows),
-            "components_equal_pieces": sum(r["residual_scenario"]["components"] == r["residual_scenario"]["pieces"] for r in rows),
-            "start_mask_id3_is_pieces": sum(r["start_mask_id3_is_pieces"] for r in rows),
-            "pieces_on_rim": sum(r["pieces_on_rim"] for r in rows),
-        },
-    }
+    summary = c4_summary(rows, evaluation["bootstrap"], "C4 on RHUH, no-residual scenario, target-informed scores")
     ci_low = summary["scaffold"]["ci95"][0]
     summary["gate_c_rhuh"] = {"rule": "mean gain over copy > 0 and 95% CI lower bound > 0",
                               "passed": bool(summary["scaffold"]["mean_gain_over_copy"] > 0 and ci_low > 0)}

@@ -13,9 +13,12 @@ Arrays are ``[Z, Y, X]`` on the 1-mm pre-op frame, as in the exports. Label IDs 
   class sets for supplied-scenario prompts.
 - D1 ``edit_weight`` and ``compose_edit``: the final composition of a localized edit. The decoded image is blended
   in over E only, and the decoded mask is used inside M only.
+- C4 ``check_patient`` and ``c4_summary``: the scaffold against a copy, scored against the real post-op scan, per
+  patient and over a cohort (RHUH: ``scripts/scaffold_check.py``; LUMIERE: ``lumiere_scaffold_check``).
 
-No post-op input is read here. A scenario is a supplied counterfactual, not a forecast of the real outcome, and its
-pieces are synthetic labels, never ground truth.
+The scaffold, the scenarios and the regions read no post-op input; only the C4 check reads the real post-op scan, to
+score. A scenario is a supplied counterfactual, not a forecast of the real outcome, and its pieces are synthetic
+labels, never ground truth.
 """
 
 from collections import deque
@@ -24,6 +27,7 @@ import numpy as np
 from scipy import ndimage
 
 from .controls import frame_spacing, image_scores
+from .evaluation import paired_bootstrap_ci
 
 CORE_IDS = (1, 3)
 EDEMA_ID = 2
@@ -257,13 +261,16 @@ def slice_scenario_ids(pre_label, pieces):
     return [tuple(i for i, on in ((EDEMA_ID, e), (ENHANCING_ID, p)) if on) for e, p in zip(edema, enhancing)]
 
 
-def check_patient(arrays, evaluation, *, residual_seed=2026):
+def check_patient(arrays, evaluation, *, residual_seed=2026, target_has_residual=None):
     """C4 for one exported patient: frozen image scores of the copy, the scaffold and the legacy recipe.
 
     The scaffold uses the no-residual scenario. Scores are against the real post-op scan, so they are
     target-informed and serve only to check the scaffold. Also returned: the largest change outside E (must be 0),
     whether a repeat gives the same image, and one residual scenario drawn from ``residual_seed`` with its start-mask
     check.
+
+    ``target_has_residual`` is the real post-op scan's residual status from another source, for exports without a
+    trusted post-op label (LUMIERE: the expert rating). By default it is read from ``arrays["label"]`` (ID 3).
     """
     spacing = frame_spacing(arrays["frame_affine"])
     if not np.allclose(spacing, 1.0):
@@ -286,8 +293,72 @@ def check_patient(arrays, evaluation, *, residual_seed=2026):
         "mask_region_ml": round(float(mask_region.sum()) * voxel_ml, 3),
         "outside_edit_region_max_change": float(np.abs(image[outside] - pre[outside]).max()) if outside.any() else 0.0,
         "repeat_identical": bool(np.array_equal(image, repeat)),
-        "target_has_residual": bool((np.asarray(arrays["label"]) == ENHANCING_ID).any()),
+        "target_has_residual": (bool((np.asarray(arrays["label"]) == ENHANCING_ID).any())
+                                if target_has_residual is None else bool(target_has_residual)),
         "residual_scenario": scenario,
         "start_mask_id3_is_pieces": bool(np.array_equal(start == ENHANCING_ID, pieces)),
         "pieces_on_rim": bool(rim_candidates(label, spacing)[pieces].all()) if pieces.any() else True,
+    }
+
+
+C4_ARMS = ("copy", "scaffold", "legacy")
+
+
+def _spread(values):
+    values = np.asarray(values, float)
+    return {"n": int(values.size), "median": round(float(np.median(values)), 4),
+            "min": round(float(values.min()), 4), "max": round(float(values.max()), 4)}
+
+
+def _gain(rows, arm, bootstrap):
+    deltas = [r["copy"]["primary_mae"] - r[arm]["primary_mae"] for r in rows]
+    if len(deltas) < 2:
+        return {"mean_gain_over_copy": None, "ci95": None, "n": len(deltas),
+                "lower_than_copy": int(sum(d > 0 for d in deltas)), "reason": "fewer than 2 patients"}
+    ci = paired_bootstrap_ci(deltas, resamples=bootstrap["resamples"], seed=bootstrap["seed"],
+                             confidence=bootstrap["confidence"])
+    return {"mean_gain_over_copy": round(ci["mean"], 4), "ci95": [round(ci["low"], 4), round(ci["high"], 4)],
+            "n": ci["n"], "lower_than_copy": int(sum(d > 0 for d in deltas))}
+
+
+def primary_mae_na(rows):
+    """Per arm, how many ``check_patient`` rows have an NA primary MAE. NA counts as a failure, never excluded."""
+    return {arm: sum(r[arm]["primary_mae_na_reason"] != "" for r in rows) for arm in C4_ARMS}
+
+
+def c4_summary(rows, bootstrap, check):
+    """C4 over ``check_patient`` rows: copy, scaffold and legacy recipe, and the checks. Names no patient.
+
+    Every primary MAE must be available (``primary_mae_na``), else this raises. The gains are paired per patient
+    with a patient bootstrap (``bootstrap``: the frozen ``resamples``, ``seed`` and ``confidence``). Patients
+    without residual tumor in the real post-op scan are summarized again on their own.
+    """
+    rows = list(rows)
+    na = primary_mae_na(rows)
+    if any(na.values()):
+        raise ValueError(f"NA primary MAE: {na}; count them explicitly before any summary")
+    no_residual = [r for r in rows if not r["target_has_residual"]]
+    return {
+        "experiment": "EXP-2026-008", "check": check,
+        "patients": len(rows), "no_residual_patients": len(no_residual),
+        "primary_mae": {arm: _spread([r[arm]["primary_mae"] for r in rows]) for arm in C4_ARMS},
+        "scaffold": _gain(rows, "scaffold", bootstrap),
+        "scaffold_no_residual": _gain(no_residual, "scaffold", bootstrap),
+        "legacy_2026_11_17_recipe": _gain(rows, "legacy", bootstrap),
+        "scaffold_minus_legacy_primary_mae": _spread([r["scaffold"]["primary_mae"] - r["legacy"]["primary_mae"]
+                                                      for r in rows]),
+        "stable_mae_change_scaffold_minus_copy_max": round(max(r["scaffold"]["stable_mae"] - r["copy"]["stable_mae"]
+                                                               for r in rows), 6),
+        "outside_edit_region_max_change": max(r["outside_edit_region_max_change"] for r in rows),
+        "repeat_identical": sum(r["repeat_identical"] for r in rows),
+        "core_ml": _spread([r["core_ml"] for r in rows]),
+        "residual_scenario_seed_2026": {
+            "pieces": _spread([r["residual_scenario"]["pieces"] for r in rows]),
+            "achieved_ml": _spread([r["residual_scenario"]["achieved_ml"] for r in rows]),
+            "reached_target": sum(r["residual_scenario"]["reached_target"] for r in rows),
+            "components_equal_pieces": sum(r["residual_scenario"]["components"] == r["residual_scenario"]["pieces"]
+                                           for r in rows),
+            "start_mask_id3_is_pieces": sum(r["start_mask_id3_is_pieces"] for r in rows),
+            "pieces_on_rim": sum(r["pieces_on_rim"] for r in rows),
+        },
     }
