@@ -634,3 +634,11 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - `experiments/registry/EXP-2026-007.md`: round 1 (E0, E0s, E3m), E-eval (W4 recipe, 3 + 4 held-out patients, 3
   seeds), rules with a seed noise floor, budget about 5 GPU hours, six decisions for the researcher.
 - Next: the researcher's answers to the six decisions; then implementation (CPU tests first).
+
+## 2026-11-24 - Multi-sequence check: RHUH done, LUMIERE notebook ready
+
+- `rhuh_synthesis/core_signal.py`, `run_signal_check`, `scripts/core_signal_check.py`,
+  `notebooks/LUMIERE_Colab_c4_signals.ipynb`. Tests: 13 + 1 new passed, 54 with the scaffold tests; 7 of 7 mutations.
+- RHUH: the loser's core is bright on T1 (blood-like or protein-like), not enhancing; no winner's core is bright.
+- Next: the researcher runs the LUMIERE notebook (CPU, about 10 to 20 minutes) and sends the SUMMARY and the TABLE,
+  and looks at the review pages on Drive.

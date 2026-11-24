@@ -235,5 +235,106 @@ def run_region_check(run_dir, config, c4_record, out_path, *, source_run, expect
     return summary, table, path, digest
 
 
+ATLAS_ROLES = {"t1": "atlas_t1", "t1ce": "atlas_ct1", "t2": "atlas_t2", "flair": "atlas_flair"}
+AGREEMENT_KEYS = ("enhancing_dice", "lesion_centroid_distance_mm", "dbt_enhancing_ml", "hdglio_enhancing_ml")
+SIGNAL_EXTRA = (("tools Dice", ("mask_agreement", "enhancing_dice"), "{:.2f}"),
+                ("centroid mm", ("mask_agreement", "lesion_centroid_distance_mm"), "{:.1f}"))
+
+
+def run_signal_check(run_dir, lumiere_root, config, regions_record, out_dir, *, source_run, expected, repo_root,
+                     contrast_pairs=2, progress=None):
+    """C4 follow-up 2 on LUMIERE: the post-op signal of the pre-op core across sequences (``core_signal``).
+
+    Same cohort checks as ``run_c4_lumiere``. In addition, ``manifest.json`` must match the source run's manifest
+    hash, ``regions_record`` (``run_region_check``'s record) the split and the accepted pairs, and each post-op
+    atlas T1ce file the SHA-256 in the manifest and the sidecar. The moved T1ce must reproduce the export within
+    1e-6. Adds r2's pre-op mask agreement between the two tools.
+
+    Writes into the new folder ``out_dir``:
+
+    - one write-once record (it names patients);
+    - private review pages ``overlays/rank_NN.png`` of the pairs where the fill loses and of the ``contrast_pairs``
+      with the largest gain. NN is the rank, worst first.
+
+    Returns ``(summary, table, record path, sha256)``; the summary and table name no one.
+    """
+    from .core_signal import (
+        core_signal, file_sha256 as sequence_sha256, reproduces_export, save_core_overlay, sequences_in_frame,
+        signal_summary, signal_table,
+    )
+
+    run_dir, lumiere_root, out_dir = Path(run_dir), Path(lumiere_root), Path(out_dir)
+    split, split_sha256, run = verified_split(run_dir)
+    pairs, counts = accepted_training_pairs(run_dir, split, split_sha256)
+    if len(pairs) != expected:
+        raise ValueError(f"{len(pairs)} accepted training-role pairs, expected {expected}")
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    if hashlib.sha256(canonical_json(manifest).encode("utf-8")).hexdigest() != run.get("manifest_sha256"):
+        raise ValueError("manifest.json does not match the manifest hash recorded in run.json")
+    if regions_record["source"]["split_sha256"] != split_sha256:
+        raise ValueError("The region record belongs to another split")
+    regions = regions_record["patients"]
+    if {sidecar["patient"] for _, sidecar in pairs} != set(regions):
+        raise ValueError("The region record's pairs differ from the accepted pairs")
+    agreement = json.loads((run_dir / "mask_check.json").read_text(encoding="utf-8"))["pairs"]
+    ranked = sorted(regions, key=lambda p: -regions[p]["delta"])
+    rank = {patient: i for i, patient in enumerate(ranked, start=1)}
+    review = {p for p in ranked if regions[p]["delta"] > 0} | set(ranked[len(ranked) - contrast_pairs:])
+    if out_dir.exists():
+        raise FileExistsError(f"{out_dir} exists: use a new run folder")
+    (out_dir / "overlays").mkdir(parents=True)
+    rows, pages = {}, []
+    for i, (path, sidecar) in enumerate(pairs, start=1):
+        patient = sidecar["patient"]
+        with np.load(path) as data:
+            arrays = {key: data[key] for key in data.files}
+        if "label" in arrays:
+            raise ValueError("A LUMIERE export holds a 'label' key; its post-op labels are unverified and are not read")
+        post = manifest["patients"][patient]["post"]
+        absent = sorted(role for role in ATLAS_ROLES.values() if role not in post["files"])
+        if absent:
+            raise ValueError(f"pair {i}: the manifest lacks the post-op atlas files {absent}")
+        files = {name: lumiere_root / post["files"][role] for name, role in ATLAS_ROLES.items()}
+        recorded = post["t1ce"]["file_sha256"]
+        if post["t1ce"]["path"] != post["files"]["atlas_ct1"]:
+            raise ValueError(f"pair {i}: the manifest's T1ce is not its atlas T1ce file")
+        if sequence_sha256(files["t1ce"]) != recorded or sidecar["source_hashes"]["post"]["t1ce"] != recorded:
+            raise ValueError(f"pair {i}: the post-op T1ce file differs from the manifest or the export")
+        sequences = sequences_in_frame(files, sidecar)
+        difference, same_foreground = reproduces_export(sequences, arrays, sidecar)
+        if difference > 1e-6 or not same_foreground:
+            raise ValueError(f"pair {i}: the moved T1ce does not reproduce the export ({difference:.3g})")
+        row = core_signal(sequences, arrays, config["evaluation"])
+        row.update(status=sidecar["resection"], delta=regions[patient]["delta"], reproduction_max_difference=difference,
+                   mask_agreement={key: agreement[patient]["pre"].get(key) for key in AGREEMENT_KEYS},
+                   sequence_sha256={name: sequence_sha256(p) for name, p in files.items()})
+        if patient in review and not row["na_reason"]:
+            page = out_dir / "overlays" / f"rank_{rank[patient]:02d}.png"
+            title = (f"rank {rank[patient]} of {len(ranked)} | {row['status']} | delta {row['delta']:+.4f} | "
+                     f"K3 {row['K3']['pattern']} | K1 {row['K1']['pattern']}")
+            save_core_overlay(page, arrays, sequences, title)
+            pages.append(page.name)
+        rows[patient] = row
+        if progress:
+            progress(f"pair {i}/{len(pairs)} done")
+    values = list(rows.values())
+    worse = [r for r in values if not r["na_reason"] and r["delta"] > 0]
+    with_dice = [r for r in values if r["mask_agreement"]["enhancing_dice"] is not None]
+    flat = [{"dice": r["mask_agreement"]["enhancing_dice"]} for r in with_dice]
+    worse_flat = [flat[k] for k, r in enumerate(with_dice) if any(r is w for w in worse)]
+    summary = {"check": "C4 follow-up 2 on LUMIERE: post-op signal of the pre-op core across sequences",
+               "source": {"run": source_run, "split_sha256": split_sha256[:12]}, "cohort": counts,
+               **signal_summary(values), "review_pages": sorted(pages),
+               "tools_dice_ranks_of_worse_pairs_lowest_first": _lowest_first_ranks(flat, "dice", worse_flat),
+               "pairs_with_tools_dice": len(with_dice)}
+    table = signal_table(values, extra=SIGNAL_EXTRA)
+    record = {"summary": summary, "patients": rows, "code": code_version(repo_root), "environment": environment(),
+              "config_sha256": {"EXP-2026-001": config_sha256(config)},
+              "source": {"run": source_run, "split_sha256": split_sha256, "manifest_sha256": run.get("manifest_sha256")},
+              "regions_record_source": regions_record["summary"].get("source")}
+    record_path, digest = write_once_json(out_dir / "c4_lumiere_signals.json", record)
+    return summary, table, record_path, digest
+
+
 __all__ = ["RESIDUAL_BY_RATING", "accepted_training_pairs", "check_pair", "file_sha256", "read_qc",
-           "run_c4_lumiere", "run_region_check", "summarize", "verified_split"]
+           "run_c4_lumiere", "run_region_check", "run_signal_check", "summarize", "verified_split"]

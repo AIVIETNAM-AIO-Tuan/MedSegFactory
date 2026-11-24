@@ -1179,3 +1179,14 @@ after run r1.
   the ladder, and mixing first. E1, E2 and E4 move to round 2.
 - LUMIERE rows (proposal): mask partner pure noise at timestep 999 with no mask loss (the UNet couples the streams),
   empty prompts, uniform slices. No code until approval.
+
+## 2026-11-24 - EXP-2026-008 C4 follow-up 2: the post-op core across sequences; RHUH done, LUMIERE notebook ready
+
+- The researcher asked for the multi-sequence check first. Each training pair's post-op T1, T1ce, T2 and FLAIR are moved
+  into the pre-op frame with the stored matrix; the moved T1ce must reproduce the export (it did, exactly, 24 of 24
+  on RHUH and 3 of 3 on the laptop's LUMIERE sample).
+- The reading rule was fixed in the card before any number. Testing found a flaw (dark fluid could be called
+  enhancing), fixed before any number.
+- RHUH (`c4_rhuh_signals_v1`): the one patient where the fill loses has a core that is bright on T1, T2 and FLAIR, not
+  enhancing. The six patterns do not separate the winners (5 of 23 called dark): a limitation, recorded.
+- A secondary reading (T1ce brightness led by T1 or by enhancement) was added after RHUH and before LUMIERE.
