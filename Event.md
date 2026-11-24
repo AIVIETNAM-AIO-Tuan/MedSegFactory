@@ -1159,3 +1159,14 @@ after run r1.
 - RHUH (24 training patients, laptop): the gain comes from K3 (median -0.021 without residual). K1 adds almost
   nothing, because RHUH's necrosis is already as dark as the fill before surgery.
 - The LUMIERE notebook is ready (`notebooks/LUMIERE_Colab_c4_regions.ipynb`).
+
+## 2026-11-24 - EXP-2026-008 C4 region split on LUMIERE: the losses sit in post-op cores that are not dark
+
+- Run `c4_lumiere_regions_v1` (Colab CPU, commit 42b23d4): all 25 splits reproduce C4; record confirmed by MD5.
+- By the reading fixed before the run, "collapse, filling or misplaced masks" fits the 4 losing CRET pairs. Their
+  post-op values are tissue-like or brighter in both K1 and K3, and the loss is shared (K3 0.55, K1 0.27, band 0.24).
+- The label-definition lead fits 1 pair of 4. Registration does not fit: the losing pairs are not the worst registered.
+- Not planned: LUMIERE's post-op cores are less dark than RHUH's (median post-op K3 0.080 above the fill against
+  0.027), which explains most of the smaller gain. Timing is a candidate cause, not checked.
+- For the training series' card: LUMIERE's pre-op masks need no harmonization for the scaffold; mixing adds post-op
+  cores that are not dark (11 of 25 pairs against 7 of 24).

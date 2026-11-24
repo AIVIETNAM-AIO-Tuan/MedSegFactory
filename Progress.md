@@ -622,3 +622,9 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - RHUH run `c4_rhuh_regions_v1`: 24 of 24 splits reproduce C4. The fill gains on the enhancing rim (K3).
 - Next: the researcher runs the region notebook (CPU, about 5 to 10 minutes) and sends the SUMMARY and the TABLE;
   then the training series' card.
+
+## 2026-11-24 - C4 region split on LUMIERE recorded
+
+- 4 losses: post-op core not dark (K1 and K3 tissue-like), not the label definition, not registration.
+- Outputs kept privately in `data/LUMIERE/EXP-2026-008/`.
+- Next: the training series' card (EXP-2026-007), with RHUH-only and mixed arms.
