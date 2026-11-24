@@ -1253,3 +1253,18 @@ after run r1.
   - The oracle helps on average (-0.0052, interval -0.0096 to -0.0021) and fixes the one RHUH loss. The class
     level does not fix it.
   - The 3 not-dark RHUH cores have very different T1ce levels, so a class-typical level misses each one.
+
+## 2026-11-25 - EXP-2026-008 C4 follow-up 4 on LUMIERE: the right level fixes every loss; the class level is not shown to help
+
+- Run `c4_lumiere_level_v1` (Colab CPU, commit 315eaf8): 25 of 25 pairs scored; record confirmed by MD5. The copy
+  and dark scores equal the region record's, and each pair's loss and K3 z(T1) equal follow-up 2's table.
+- Q1, over both datasets: at each pair's own real level (the oracle), the flat fill beats the copy in 5 of the 5
+  losses and in every pair (24 of 24 and 25 of 25). A flat level is enough for these losses, as far as the primary
+  MAE can tell; the MAE cannot show whether texture matters.
+- Q2, class minus dark: LUMIERE -0.0029, interval -0.0066 to +0.0004; RHUH +0.0003. Not shown in either dataset
+  (INCONCLUSIVE).
+- Q3, class minus pooled: the interval includes 0 in both datasets.
+- Description: on LUMIERE the class level helps the 7 not-dark pairs (-0.0159 against dark) and turns all 4 losses
+  into gains; on RHUH it does not fix the one loss. The classes' levels overlap in both datasets.
+- Proposal for EXP-2026-007 (decision 7 updated): the cavity content as a level in the scenario, drawn from the
+  training-role pairs' own levels, not as a class. Whether the sampler carries the level is not tested.

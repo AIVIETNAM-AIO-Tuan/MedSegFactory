@@ -682,3 +682,12 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - RHUH: the class level is not shown to help. A pair's own level (the oracle) helps a little on average.
 - Next: the researcher runs `notebooks/LUMIERE_Colab_c4_level.ipynb` (CPU, about 5 to 10 minutes, no Drive mount)
   and sends the SUMMARY and the TABLE.
+
+## 2026-11-25 - C4 follow-up 4 on LUMIERE recorded
+
+- At its own real level, the flat fill beats the copy in every pair of both datasets, all 5 losses included.
+- A typical level for the class (dark or not dark on T1) is not shown to help in either dataset. On LUMIERE it
+  fixes all 4 losses; on RHUH it does not fix the one.
+- Outputs kept privately in `data/LUMIERE/EXP-2026-008/`.
+- Next: the researcher's decisions on card E (7; decision 7 now proposes a level) and EXP-2026-009 (3). Proposed,
+  not approved: a GPU check that the localized sampler carries a fill level other than `mu` into its output.
