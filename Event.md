@@ -1268,3 +1268,17 @@ after run r1.
   into gains; on RHUH it does not fix the one loss. The classes' levels overlap in both datasets.
 - Proposal for EXP-2026-007 (decision 7 updated): the cavity content as a level in the scenario, drawn from the
   training-role pairs' own levels, not as a class. Whether the sampler carries the level is not tested.
+
+## 2026-11-25 - Decisions: card E approved with a Codex review first; EXP-2026-009 decisions 1 and 2 approved
+
+- The researcher answered a numbered list of 17 open decisions: "duyệt từ 1-10, 11 tôi còn phân vẫn T1 và T1ce,
+  hoặc là làm thành 2.5D luôn các đề xuất còn lại hoãn chờ kết quả sau".
+- Approved:
+  - EXP-2026-007 (card E), decisions 1–7: one change per run against E0; round 1 = E0, E0s and E3m; E0s as the
+    noise floor; LUMIERE rows as image-only rows; E-eval frozen; E1, E2 and E4 in round 2; the literature-derived
+    elements after their CPU checks.
+  - A Codex review of card E before any code.
+  - EXP-2026-009, decisions 1 and 2: T1 with T1ce after E round 1, starting with the VAE round trip; option A first.
+- Open: EXP-2026-009 decision 3 (thick-slice T1 as the target). The researcher raised making the model 2.5D.
+- Postponed until later results: the GPU check that the sampler carries a fill level; a text-control arm in E-eval;
+  Stage 5 part 2; a cavity class in the mask; bundling E1's two edits; Package B.

@@ -691,3 +691,12 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - Outputs kept privately in `data/LUMIERE/EXP-2026-008/`.
 - Next: the researcher's decisions on card E (7; decision 7 now proposes a level) and EXP-2026-009 (3). Proposed,
   not approved: a GPU check that the localized sampler carries a fill level other than `mu` into its output.
+
+## 2026-11-25 - Card E approved; Codex review next
+
+- Card E (EXP-2026-007): decisions 1–7 approved. A Codex review of the card comes before any code.
+- EXP-2026-009: decisions 1 and 2 approved; decision 3 open (thick-slice T1, or a 2.5D design).
+- Postponed until later results: the GPU level check, a text-control arm, Stage 5 part 2, a cavity class in the
+  mask, bundling E1, Package B.
+- Next: the researcher asks Codex to review card E. Claude verifies the findings and builds them into the card,
+  then implements round 1 with CPU tests.

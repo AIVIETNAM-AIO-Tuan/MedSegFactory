@@ -255,13 +255,13 @@ Then: B3-B5 after A2; C4 after C1-C3 and A7; D2 after C and D1 (GPU); E1-E2 afte
 | # | Decision | Recommendation | State |
 |---|---|---|---|
 | 1 | Who revises EXP-2026-004, and whether the mesh, ellipsoid, donor and contraction arms are dropped | Codex revises; drop those arms, keep the localized-editing arms | decided 2026-11-21: Claude takes C and D in a new card (EXP-2026-008) with Codex reviewing; those arms are outside the approved phase 2 scope |
-| 2 | Run Stage 5 part 2 now | Yes | open |
+| 2 | Run Stage 5 part 2 now | Yes | postponed by the researcher on 2026-11-25 until later results; EXP-2026-007 uses E0's E-eval as its baseline |
 | 3 | LUMIERE tiers | Same-week only | decided 2026-11-17: next-week and later tiers are not used |
 | 4 | Hold out 20% of eligible same-week LUMIERE patients as a development set | Yes | approved 2026-11-21 |
 | 5 | LUMIERE masks | Pre-op: DeepBraTumIA with a cross-check. Post-op: no voxel label as a target until Gate B passes | decided 2026-11-17 |
-| 6 | Add a cavity class to the mask now | No; keep RHUH's convention this phase | open |
-| 7 | Bundle the two E1 edits | Yes | open |
-| 8 | Gate thresholds in A, B, D and E | Freeze in each card after review | open; A's are listed in EXP-2026-005; D's were frozen in EXP-2026-008 after Codex's review and approved on 2026-11-22 |
+| 6 | Add a cavity class to the mask now | No; keep RHUH's convention this phase | postponed by the researcher on 2026-11-25 until later results |
+| 7 | Bundle the two E1 edits | Yes | postponed by the researcher on 2026-11-25; E1 is in round 2 of EXP-2026-007 |
+| 8 | Gate thresholds in A, B, D and E | Freeze in each card after review | open for B; A's are listed in EXP-2026-005; D's were frozen in EXP-2026-008 after Codex's review and approved on 2026-11-22; E's were approved with EXP-2026-007 on 2026-11-25 (its decision 5), before its Codex review |
 | 9 | Sampler arm with the mask held fixed to the scenario (Package D) | Add it to the wiring test D2 | approved 2026-11-21; run 2026-11-23 (D2 d2_r3): INCONCLUSIVE, the fixed mask did not brighten the scenario's pieces |
 | 10 | Labelled pre-op scans as extra training rows (run E4) | RHUH pre-op first, then LUMIERE training-role pre-op; only if D2 shows the failure; MU not used for this | the researcher's proposal (LUMIERE in place of MU); approved 2026-11-21 |
 | 11 | Memorization check in every training run | Add it | approved 2026-11-21 |
