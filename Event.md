@@ -1202,3 +1202,12 @@ after run r1.
   +0.54 and +0.53), not enhancement (+0.08).
 - Proposal awaiting the researcher: a cavity-signal parameter (the core's fill level on T1ce) in the supplied
   scenario, tested first on CPU with the level matched to each pair's real outcome.
+
+## 2026-11-24 - Do pre-op features tell which cores are not dark? No consistent hint (exploratory)
+
+- The researcher asked whether the pre-op image hints at a dark or not-dark core, or whether it depends on the
+  surgery, and whether it could go into the text stream.
+- Checked on the features already in the C4 records: core volume, necrosis share, pre-op brightness. LUMIERE's larger
+  cores are less dark (Spearman +0.40, p 0.05); RHUH shows no relation (+0.12). Nothing relates in both datasets.
+- Location, pre-op blood and ADC are not tested. The text stream today carries class names only; the text encoder is
+  frozen. A cavity phrase in the prompt is proposed as an arm for the training series, after the CPU test.
