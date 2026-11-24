@@ -1190,3 +1190,15 @@ after run r1.
 - RHUH (`c4_rhuh_signals_v1`): the one patient where the fill loses has a core that is bright on T1, T2 and FLAIR, not
   enhancing. The six patterns do not separate the winners (5 of 23 called dark): a limitation, recorded.
 - A secondary reading (T1ce brightness led by T1 or by enhancement) was added after RHUH and before LUMIERE.
+
+## 2026-11-24 - EXP-2026-008 C4 follow-up 2 on LUMIERE: the fixed rule leaves the losses unexplained
+
+- Run `c4_lumiere_signals_v1` (Colab CPU, commit 69ce7a8): the moved T1ce reproduces the export in 25 of 25 pairs;
+  the record and six review pages are confirmed by MD5.
+- By the fixed rule, neither blood or enhancement (0 of 4 losing cores) nor collapse or a misplaced mask (1 of 4)
+  explains the losses, and the six patterns do not separate the winners (6 of 21 dark), as on RHUH.
+- Exploratory, not planned (5 losing pairs across both datasets): every losing core is not dark on T1, 4 of 5 are
+  very bright on FLAIR, and none enhances. The fill's difference tracks K3's T1 and FLAIR signal (pooled Spearman
+  +0.54 and +0.53), not enhancement (+0.08).
+- Proposal awaiting the researcher: a cavity-signal parameter (the core's fill level on T1ce) in the supplied
+  scenario, tested first on CPU with the level matched to each pair's real outcome.

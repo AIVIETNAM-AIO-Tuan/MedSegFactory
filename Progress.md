@@ -642,3 +642,11 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - RHUH: the loser's core is bright on T1 (blood-like or protein-like), not enhancing; no winner's core is bright.
 - Next: the researcher runs the LUMIERE notebook (CPU, about 10 to 20 minutes) and sends the SUMMARY and the TABLE,
   and looks at the review pages on Drive.
+
+## 2026-11-24 - Multi-sequence check on LUMIERE recorded
+
+- 4 losses: not explained by the fixed rule. Exploratory: the losing cores are not dark on T1, are bright on FLAIR
+  and do not enhance; RHUH's one loss is the same.
+- Outputs kept privately in `data/LUMIERE/EXP-2026-008/`.
+- Next: the researcher decides on the cavity-signal parameter (a CPU test first, or straight into card E) and answers
+  card E's six decisions.
