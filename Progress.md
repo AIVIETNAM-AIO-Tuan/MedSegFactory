@@ -628,3 +628,9 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - 4 losses: post-op core not dark (K1 and K3 tissue-like), not the label definition, not registration.
 - Outputs kept privately in `data/LUMIERE/EXP-2026-008/`.
 - Next: the training series' card (EXP-2026-007), with RHUH-only and mixed arms.
+
+## 2026-11-24 - Card E drafted
+
+- `experiments/registry/EXP-2026-007.md`: round 1 (E0, E0s, E3m), E-eval (W4 recipe, 3 + 4 held-out patients, 3
+  seeds), rules with a seed noise floor, budget about 5 GPU hours, six decisions for the researcher.
+- Next: the researcher's answers to the six decisions; then implementation (CPU tests first).

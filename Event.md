@@ -1170,3 +1170,12 @@ after run r1.
   0.027), which explains most of the smaller gain. Timing is a candidate cause, not checked.
 - For the training series' card: LUMIERE's pre-op masks need no harmonization for the scaffold; mixing adds post-op
   cores that are not dark (11 of 25 pairs against 7 of 24).
+
+## 2026-11-24 - EXP-2026-007 (training series E) drafted for approval
+
+- After the C4 checks, the researcher asked for card E. The draft proposes round 1 = E0 (r2), E0s (r2's recipe, seed
+  2027, the training-noise floor) and E3m (r2's recipe plus LUMIERE's 25 training-role pairs as image-only rows).
+- Two proposed changes to PHASE2_PLAN.md Package E, awaiting the researcher: one change per run against E0 in place of
+  the ladder, and mixing first. E1, E2 and E4 move to round 2.
+- LUMIERE rows (proposal): mask partner pure noise at timestep 999 with no mask loss (the UNet couples the streams),
+  empty prompts, uniform slices. No code until approval.
