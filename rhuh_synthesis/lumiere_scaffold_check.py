@@ -18,9 +18,13 @@ The cohort is enforced positively, from run r2's own records:
 
 Scores are against the real post-op scan, so they are target-informed. These pairs never trained the r2 weights and
 did not shape the scaffold, so this is the scaffold's first check outside RHUH. Gate C stays frozen on RHUH; here the
-same rule is reported and decides nothing. ``run_region_check`` is the follow-up: where, by region of the pre-op core,
-the fill gains or loses (``scaffold_regions``). Records hold patient names: keep them private. Messages, summaries
-and tables name no patient.
+same rule is reported and decides nothing. The follow-ups:
+
+- ``run_region_check``: where, by region of the pre-op core, the fill gains or loses (``scaffold_regions``);
+- ``run_signal_check``: the post-op signal of the core across T1, T1ce, T2 and FLAIR (``core_signal``);
+- ``run_wall_check``: enhancement in a shell around the core (``core_signal.wall_enhancement``).
+
+Records hold patient names: keep them private. Messages, summaries and tables name no patient.
 """
 
 import csv
@@ -236,6 +240,64 @@ def run_region_check(run_dir, config, c4_record, out_path, *, source_run, expect
 
 
 ATLAS_ROLES = {"t1": "atlas_t1", "t1ce": "atlas_ct1", "t2": "atlas_t2", "flair": "atlas_flair"}
+
+
+def _signal_inputs(run_dir, lumiere_root, regions_record, *, expected):
+    """Input checks shared by C4 follow-ups 2 and 3, and a loader of each accepted pair's sequences.
+
+    Same cohort checks as ``run_c4_lumiere``. ``manifest.json`` must match the source run's manifest hash, and
+    ``regions_record`` (``run_region_check``'s record) the split and the accepted pairs. Returns ``(context,
+    pair_inputs)``. ``pair_inputs(selected=None)`` yields ``(index, patient, sidecar, arrays, files, sequences,
+    difference)`` for every accepted pair, or only the patients in ``selected``. Per pair it refuses an export with a
+    ``label`` key, a manifest without the post-op atlas files, a T1ce file that differs from the manifest or the
+    sidecar, and a moved T1ce that does not reproduce the export within 1e-6.
+    """
+    from .core_signal import file_sha256 as sequence_sha256, reproduces_export, sequences_in_frame
+
+    run_dir, lumiere_root = Path(run_dir), Path(lumiere_root)
+    split, split_sha256, run = verified_split(run_dir)
+    pairs, counts = accepted_training_pairs(run_dir, split, split_sha256)
+    if len(pairs) != expected:
+        raise ValueError(f"{len(pairs)} accepted training-role pairs, expected {expected}")
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    if hashlib.sha256(canonical_json(manifest).encode("utf-8")).hexdigest() != run.get("manifest_sha256"):
+        raise ValueError("manifest.json does not match the manifest hash recorded in run.json")
+    if regions_record["source"]["split_sha256"] != split_sha256:
+        raise ValueError("The region record belongs to another split")
+    regions = regions_record["patients"]
+    if {sidecar["patient"] for _, sidecar in pairs} != set(regions):
+        raise ValueError("The region record's pairs differ from the accepted pairs")
+    agreement = json.loads((run_dir / "mask_check.json").read_text(encoding="utf-8"))["pairs"]
+
+    def pair_inputs(selected=None):
+        for i, (path, sidecar) in enumerate(pairs, start=1):
+            patient = sidecar["patient"]
+            if selected is not None and patient not in selected:
+                continue
+            with np.load(path) as data:
+                arrays = {key: data[key] for key in data.files}
+            if "label" in arrays:
+                raise ValueError("A LUMIERE export holds a 'label' key; its post-op labels are unverified and are "
+                                 "not read")
+            post = manifest["patients"][patient]["post"]
+            absent = sorted(role for role in ATLAS_ROLES.values() if role not in post["files"])
+            if absent:
+                raise ValueError(f"pair {i}: the manifest lacks the post-op atlas files {absent}")
+            files = {name: lumiere_root / post["files"][role] for name, role in ATLAS_ROLES.items()}
+            recorded = post["t1ce"]["file_sha256"]
+            if post["t1ce"]["path"] != post["files"]["atlas_ct1"]:
+                raise ValueError(f"pair {i}: the manifest's T1ce is not its atlas T1ce file")
+            if sequence_sha256(files["t1ce"]) != recorded or sidecar["source_hashes"]["post"]["t1ce"] != recorded:
+                raise ValueError(f"pair {i}: the post-op T1ce file differs from the manifest or the export")
+            sequences = sequences_in_frame(files, sidecar)
+            difference, same_foreground = reproduces_export(sequences, arrays, sidecar)
+            if difference > 1e-6 or not same_foreground:
+                raise ValueError(f"pair {i}: the moved T1ce does not reproduce the export ({difference:.3g})")
+            yield i, patient, sidecar, arrays, files, sequences, difference
+
+    context = {"split_sha256": split_sha256, "run": run, "counts": counts, "regions": regions,
+               "agreement": agreement, "pairs": len(pairs)}
+    return context, pair_inputs
 AGREEMENT_KEYS = ("enhancing_dice", "lesion_centroid_distance_mm", "dbt_enhancing_ml", "hdglio_enhancing_ml")
 SIGNAL_EXTRA = (("tools Dice", ("mask_agreement", "enhancing_dice"), "{:.2f}"),
                 ("centroid mm", ("mask_agreement", "lesion_centroid_distance_mm"), "{:.1f}"))
@@ -258,25 +320,12 @@ def run_signal_check(run_dir, lumiere_root, config, regions_record, out_dir, *, 
 
     Returns ``(summary, table, record path, sha256)``; the summary and table name no one.
     """
-    from .core_signal import (
-        core_signal, file_sha256 as sequence_sha256, reproduces_export, save_core_overlay, sequences_in_frame,
-        signal_summary, signal_table,
-    )
+    from .core_signal import core_signal, file_sha256 as sequence_sha256, save_core_overlay, signal_summary, signal_table
 
-    run_dir, lumiere_root, out_dir = Path(run_dir), Path(lumiere_root), Path(out_dir)
-    split, split_sha256, run = verified_split(run_dir)
-    pairs, counts = accepted_training_pairs(run_dir, split, split_sha256)
-    if len(pairs) != expected:
-        raise ValueError(f"{len(pairs)} accepted training-role pairs, expected {expected}")
-    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
-    if hashlib.sha256(canonical_json(manifest).encode("utf-8")).hexdigest() != run.get("manifest_sha256"):
-        raise ValueError("manifest.json does not match the manifest hash recorded in run.json")
-    if regions_record["source"]["split_sha256"] != split_sha256:
-        raise ValueError("The region record belongs to another split")
-    regions = regions_record["patients"]
-    if {sidecar["patient"] for _, sidecar in pairs} != set(regions):
-        raise ValueError("The region record's pairs differ from the accepted pairs")
-    agreement = json.loads((run_dir / "mask_check.json").read_text(encoding="utf-8"))["pairs"]
+    out_dir = Path(out_dir)
+    context, pair_inputs = _signal_inputs(run_dir, lumiere_root, regions_record, expected=expected)
+    split_sha256, run, counts = context["split_sha256"], context["run"], context["counts"]
+    regions, agreement = context["regions"], context["agreement"]
     ranked = sorted(regions, key=lambda p: -regions[p]["delta"])
     rank = {patient: i for i, patient in enumerate(ranked, start=1)}
     review = {p for p in ranked if regions[p]["delta"] > 0} | set(ranked[len(ranked) - contrast_pairs:])
@@ -284,26 +333,7 @@ def run_signal_check(run_dir, lumiere_root, config, regions_record, out_dir, *, 
         raise FileExistsError(f"{out_dir} exists: use a new run folder")
     (out_dir / "overlays").mkdir(parents=True)
     rows, pages = {}, []
-    for i, (path, sidecar) in enumerate(pairs, start=1):
-        patient = sidecar["patient"]
-        with np.load(path) as data:
-            arrays = {key: data[key] for key in data.files}
-        if "label" in arrays:
-            raise ValueError("A LUMIERE export holds a 'label' key; its post-op labels are unverified and are not read")
-        post = manifest["patients"][patient]["post"]
-        absent = sorted(role for role in ATLAS_ROLES.values() if role not in post["files"])
-        if absent:
-            raise ValueError(f"pair {i}: the manifest lacks the post-op atlas files {absent}")
-        files = {name: lumiere_root / post["files"][role] for name, role in ATLAS_ROLES.items()}
-        recorded = post["t1ce"]["file_sha256"]
-        if post["t1ce"]["path"] != post["files"]["atlas_ct1"]:
-            raise ValueError(f"pair {i}: the manifest's T1ce is not its atlas T1ce file")
-        if sequence_sha256(files["t1ce"]) != recorded or sidecar["source_hashes"]["post"]["t1ce"] != recorded:
-            raise ValueError(f"pair {i}: the post-op T1ce file differs from the manifest or the export")
-        sequences = sequences_in_frame(files, sidecar)
-        difference, same_foreground = reproduces_export(sequences, arrays, sidecar)
-        if difference > 1e-6 or not same_foreground:
-            raise ValueError(f"pair {i}: the moved T1ce does not reproduce the export ({difference:.3g})")
+    for i, patient, sidecar, arrays, files, sequences, difference in pair_inputs():
         row = core_signal(sequences, arrays, config["evaluation"])
         row.update(status=sidecar["resection"], delta=regions[patient]["delta"], reproduction_max_difference=difference,
                    mask_agreement={key: agreement[patient]["pre"].get(key) for key in AGREEMENT_KEYS},
@@ -316,7 +346,7 @@ def run_signal_check(run_dir, lumiere_root, config, regions_record, out_dir, *, 
             pages.append(page.name)
         rows[patient] = row
         if progress:
-            progress(f"pair {i}/{len(pairs)} done")
+            progress(f"pair {i}/{context['pairs']} done")
     values = list(rows.values())
     worse = [r for r in values if not r["na_reason"] and r["delta"] > 0]
     with_dice = [r for r in values if r["mask_agreement"]["enhancing_dice"] is not None]
@@ -336,5 +366,66 @@ def run_signal_check(run_dir, lumiere_root, config, regions_record, out_dir, *, 
     return summary, table, record_path, digest
 
 
+def run_wall_check(run_dir, lumiere_root, config, regions_record, out_dir, *, source_run, expected, repo_root,
+                   review_top=3, review_bottom=1, progress=None):
+    """C4 follow-up 3 on LUMIERE: enhancement at the border of the pre-op core (``wall_enhancement``).
+
+    Same inputs and checks as ``run_signal_check`` (``_signal_inputs``). Per pair it records ``core_signal`` (for
+    the post-op K3 z(T1)) and ``wall_enhancement``; no post-op label is read, so nothing is removed from the shell.
+
+    Writes into the new folder ``out_dir``:
+
+    - one write-once record ``c4_lumiere_wall.json`` (it names patients);
+    - private review pages ``pages/wall_rank_NN.png`` of the ``review_top`` complete resections with the largest
+      "enhancing" excess and the ``review_bottom`` with the smallest. NN is the rank in the follow-up 2 table
+      (worst delta first).
+
+    Returns ``(summary, table, record path, sha256)``; the summary and table name no one.
+    """
+    from .core_signal import (
+        COMPLETE_STATUSES, core_signal, file_sha256 as sequence_sha256, save_wall_overlay, wall_enhancement,
+        wall_summary, wall_table,
+    )
+
+    out_dir = Path(out_dir)
+    context, pair_inputs = _signal_inputs(run_dir, lumiere_root, regions_record, expected=expected)
+    regions, split_sha256, run = context["regions"], context["split_sha256"], context["run"]
+    if out_dir.exists():
+        raise FileExistsError(f"{out_dir} exists: use a new run folder")
+    (out_dir / "pages").mkdir(parents=True)
+    evaluation = config["evaluation"]
+    rows = {}
+    for i, patient, sidecar, arrays, files, sequences, difference in pair_inputs():
+        row = core_signal(sequences, arrays, evaluation)
+        row.update(status=sidecar["resection"], delta=regions[patient]["delta"], reproduction_max_difference=difference,
+                   wall=wall_enhancement(sequences, arrays, evaluation),
+                   sequence_sha256={name: sequence_sha256(p) for name, p in files.items()})
+        rows[patient] = row
+        if progress:
+            progress(f"pair {i}/{context['pairs']} done")
+    complete = [p for p, r in rows.items() if r["status"] in COMPLETE_STATUSES and not r["wall"].get("na_reason")]
+    ordered = sorted(complete, key=lambda p: -rows[p]["wall"]["excess"]["enhancing"])
+    review = list(dict.fromkeys(ordered[:review_top] + ordered[len(ordered) - review_bottom:]))
+    rank = {p: k for k, p in enumerate(sorted(rows, key=lambda p: -rows[p]["delta"]), start=1)}
+    pages = []
+    for _, patient, _, arrays, _, sequences, _ in pair_inputs(set(review)):
+        row = rows[patient]
+        page = out_dir / "pages" / f"wall_rank_{rank[patient]:02d}.png"
+        title = (f"rank {rank[patient]} of {len(rows)} | {row['status']} | "
+                 f"enhancing excess {row['wall']['excess']['enhancing']:+.3f}")
+        if save_wall_overlay(page, arrays, sequences, evaluation, title) is not None:
+            pages.append(page.name)
+    summary = {"check": "C4 follow-up 3 on LUMIERE: enhancement at the border of the pre-op core",
+               "source": {"run": source_run, "split_sha256": split_sha256[:12]}, "cohort": context["counts"],
+               **wall_summary(rows.values()), "review_pages": sorted(pages)}
+    table = wall_table(rows.values())
+    record = {"summary": summary, "patients": rows, "code": code_version(repo_root), "environment": environment(),
+              "config_sha256": {"EXP-2026-001": config_sha256(config)},
+              "source": {"run": source_run, "split_sha256": split_sha256, "manifest_sha256": run.get("manifest_sha256")},
+              "regions_record_source": regions_record["summary"].get("source")}
+    record_path, digest = write_once_json(out_dir / "c4_lumiere_wall.json", record)
+    return summary, table, record_path, digest
+
+
 __all__ = ["RESIDUAL_BY_RATING", "accepted_training_pairs", "check_pair", "file_sha256", "read_qc",
-           "run_c4_lumiere", "run_region_check", "run_signal_check", "summarize", "verified_split"]
+           "run_c4_lumiere", "run_region_check", "run_signal_check", "run_wall_check", "summarize", "verified_split"]

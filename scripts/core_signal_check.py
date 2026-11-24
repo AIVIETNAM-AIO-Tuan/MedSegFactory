@@ -38,6 +38,28 @@ def visit_paths(t1ce_path):
     return {name: t1ce_path.with_name(f"{stem}_{name}.nii.gz") for name in SEQUENCES}
 
 
+def verified_sequences(paths, manifest):
+    """For each training export, in order: ``(index, patient, arrays, sidecar, files, sequences, difference)``.
+
+    The post-op T1ce file must match the manifest and the export's sidecar, and the moved T1ce must reproduce the
+    export within ``TOLERANCE``; otherwise the run stops.
+    """
+    for i, path in enumerate(paths, start=1):
+        with np.load(path) as data:
+            arrays = {key: data[key] for key in data.files}
+        sidecar = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
+        record = manifest[path.stem]["post"]["t1ce"]
+        t1ce = REPO / record["path"]
+        if file_sha256(t1ce) != record["file_sha256"] or sidecar["source_hashes"]["post"]["t1ce"] != record["file_sha256"]:
+            sys.exit(f"patient {i}: the post-op T1ce file differs from the manifest or the export")
+        files = visit_paths(t1ce)
+        sequences = sequences_in_frame(files, sidecar)
+        difference, same_foreground = reproduces_export(sequences, arrays, sidecar)
+        if difference > TOLERANCE or not same_foreground:
+            sys.exit(f"patient {i}: the moved T1ce does not reproduce the export ({difference:.3g})")
+        yield i, path.stem, arrays, sidecar, files, sequences, difference
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=REPO / "configs/experiments/EXP-2026-001.json")
@@ -61,24 +83,12 @@ def main():
     if len(paths) != args.expected or {p.stem for p in paths} != set(regions):
         sys.exit("The accepted training patients differ from the region split record's patients")
     rows = {}
-    for i, path in enumerate(paths, start=1):
-        with np.load(path) as data:
-            arrays = {key: data[key] for key in data.files}
-        sidecar = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
-        record = manifest[path.stem]["post"]["t1ce"]
-        t1ce = REPO / record["path"]
-        if file_sha256(t1ce) != record["file_sha256"] or sidecar["source_hashes"]["post"]["t1ce"] != record["file_sha256"]:
-            sys.exit(f"patient {i}: the post-op T1ce file differs from the manifest or the export")
-        files = visit_paths(t1ce)
-        sequences = sequences_in_frame(files, sidecar)
-        difference, same_foreground = reproduces_export(sequences, arrays, sidecar)
-        if difference > TOLERANCE or not same_foreground:
-            sys.exit(f"patient {i}: the moved T1ce does not reproduce the export ({difference:.3g})")
+    for i, patient, arrays, _, files, sequences, difference in verified_sequences(paths, manifest):
         row = core_signal(sequences, arrays, config["evaluation"])
-        row.update(status=regions[path.stem]["status"], delta=regions[path.stem]["delta"],
+        row.update(status=regions[patient]["status"], delta=regions[patient]["delta"],
                    reproduction_max_difference=difference,
                    sequence_sha256={name: file_sha256(p) for name, p in files.items()})
-        rows[path.stem] = row
+        rows[patient] = row
         print(f"patient {i}/{len(paths)} done", flush=True)
     summary = signal_summary(rows.values())
     out = {"summary": summary, "patients": rows, "config_sha256": config_sha256(config), "code": code_version(REPO),

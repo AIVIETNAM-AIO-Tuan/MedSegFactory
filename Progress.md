@@ -650,3 +650,18 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - Outputs kept privately in `data/LUMIERE/EXP-2026-008/`.
 - Next: the researcher decides on the cavity-signal parameter (a CPU test first, or straight into card E) and answers
   card E's six decisions.
+
+## 2026-11-24 - Items 1–3 after the literature check
+
+- C4 follow-up 3:
+  - Code: 9 + 1 new tests; 62 passed with the scaffold tests; 9 of 9 mutations caught.
+  - RHUH run `c4_rhuh_wall_v1` done.
+  - `notebooks/LUMIERE_Colab_c4_wall.ipynb` ready (CPU, about 10 to 20 minutes).
+- `docs/CITATION_LEDGER.md` and the deep-research report committed to the fork.
+- Card E revised; EXP-2026-009 drafted.
+- Known issue, not fixed:
+  - On Windows, `manifest.write_once_json` writes CRLF, so `sha256sum` of a local record differs from its recorded
+    digest.
+  - The digest is of the canonical LF text, and the `.sha256` sidecar matches `tr -d '\r' < file | sha256sum`.
+- Next: the researcher runs the LUMIERE wall notebook and sends the SUMMARY and the TABLE. Then the primary
+  comparison (`compare_wall`) and the decisions on card E.

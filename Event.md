@@ -1211,3 +1211,20 @@ after run r1.
   cores are less dark (Spearman +0.40, p 0.05); RHUH shows no relation (+0.12). Nothing relates in both datasets.
 - Location, pre-op blood and ADC are not tested. The text stream today carries class names only; the text encoder is
   frozen. A cavity phrase in the prompt is proposed as an arm for the training series, after the CPU test.
+
+## 2026-11-24 - After the literature check: C4 follow-up 3, citation ledger, card E revised, EXP-2026-009 drafted
+
+- The researcher approved doing items 1–3 in order ("được cứ làm tuần từ 1-3").
+- C4 follow-up 3 (EXP-2026-008), design and reading fixed in the card before any number:
+  - a shell from 2 mm inside to 3 mm outside the pre-op core;
+  - "enhancing" and "T1-bright" calls by the fixed rule, as an excess over far tissue;
+  - primary comparison: LUMIERE complete resections against RHUH patients without residual tumour, with a patient
+    bootstrap.
+- RHUH run `c4_rhuh_wall_v1`:
+  - wall enhancement above background is clear in 1 of 17 patients without residual tumour (median excess -0.004);
+  - the patient where the fill loses has an enhancing shell outside its residual label (+0.200).
+  - The LUMIERE notebook is ready.
+- `docs/CITATION_LEDGER.md`: verified sources for early post-op findings, with corrections to the deep-research
+  report, which is committed with it.
+- EXP-2026-007 revised: the timing threat, the literature inputs, and decision 7. EXP-2026-009 (T1 with T1ce)
+  drafted. No code for either.
