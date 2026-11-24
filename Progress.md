@@ -665,3 +665,12 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   - The digest is of the canonical LF text, and the `.sha256` sidecar matches `tr -d '\r' < file | sha256sum`.
 - Next: the researcher runs the LUMIERE wall notebook and sends the SUMMARY and the TABLE. Then the primary
   comparison (`compare_wall`) and the decisions on card E.
+
+## 2026-11-24 - C4 follow-up 3 on LUMIERE recorded
+
+- More wall enhancement in LUMIERE is not shown, and voxel-level wall enhancement is rare in both datasets.
+- T1-bright walls are more common in LUMIERE (8 of 19 against 2 of 17; not planned), and they go with the fill's
+  losses.
+- Outputs are kept privately in `data/LUMIERE/EXP-2026-008/`.
+- Next: the researcher's decisions on card E (7) and EXP-2026-009 (3), and on the cavity-signal CPU test. Optional:
+  the researcher looks at the review pages.

@@ -1228,3 +1228,16 @@ after run r1.
   report, which is committed with it.
 - EXP-2026-007 revised: the timing threat, the literature inputs, and decision 7. EXP-2026-009 (T1 with T1ce)
   drafted. No code for either.
+
+## 2026-11-24 - EXP-2026-008 C4 follow-up 3 on LUMIERE: more wall enhancement is not shown; T1-bright walls are more common
+
+- Run `c4_lumiere_wall_v1` (Colab CPU, commit bd162a7): 25 of 25 pairs scored; record and four review pages
+  confirmed by MD5.
+- Primary, by the fixed rule: the difference in the median "enhancing" excess (LUMIERE complete resections minus
+  RHUH patients without residual tumour) is -0.009, interval -0.027 to +0.020. More wall enhancement in LUMIERE is
+  not shown. Voxel-level wall enhancement is rare in both datasets (1 of 19 and 1 of 17 above +0.05).
+- Secondary: the "T1-bright" excess difference is +0.021, interval -0.018 to +0.194, which includes 0. Not planned: a
+  T1-bright shell above +0.05 in 8 of 19 against 2 of 17 (Fisher p 0.065). All 4 LUMIERE losses have a T1-bright
+  shell and no enhancement.
+- Lead for the training series: model a T1-bright (blood-like) cavity before a benign rim. EXP-2026-007 updated;
+  EXP-2026-009 is supported.
