@@ -1241,3 +1241,15 @@ after run r1.
   shell and no enhancement.
 - Lead for the training series: model a T1-bright (blood-like) cavity before a benign rim. EXP-2026-007 updated;
   EXP-2026-009 is supported.
+
+## 2026-11-24 - EXP-2026-008 C4 follow-up 4 (the cavity level): RHUH done, LUMIERE notebook ready
+
+- The researcher approved the CPU test of the cavity class ("được, làm phép thử CPU kiểu khoang trước đi"). The
+  design and reading were fixed in the card before any number.
+- Five fills of the pre-op core: copy; dark (the scaffold); oracle (the pair's own real level); class (the typical
+  level of the other pairs of the same class, dark or not dark on T1); pooled (no class).
+- RHUH (`c4_rhuh_level_v1`):
+  - The class is not shown to help: class minus dark +0.0003, interval -0.0008 to +0.0018.
+  - The oracle helps on average (-0.0052, interval -0.0096 to -0.0021) and fixes the one RHUH loss. The class
+    level does not fix it.
+  - The 3 not-dark RHUH cores have very different T1ce levels, so a class-typical level misses each one.

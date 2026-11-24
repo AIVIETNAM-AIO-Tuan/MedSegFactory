@@ -674,3 +674,11 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - Outputs are kept privately in `data/LUMIERE/EXP-2026-008/`.
 - Next: the researcher's decisions on card E (7) and EXP-2026-009 (3), and on the cavity-signal CPU test. Optional:
   the researcher looks at the review pages.
+
+## 2026-11-24 - C4 follow-up 4 (the cavity level): RHUH done
+
+- `rhuh_synthesis/cavity_level.py`, `run_level_check`, `scripts/cavity_level_check.py` and the notebook.
+- Tests: 6 + 2 new; 72 passed; 10 of 10 mutations caught.
+- RHUH: the class level is not shown to help. A pair's own level (the oracle) helps a little on average.
+- Next: the researcher runs `notebooks/LUMIERE_Colab_c4_level.ipynb` (CPU, about 5 to 10 minutes, no Drive mount)
+  and sends the SUMMARY and the TABLE.

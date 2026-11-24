@@ -22,7 +22,8 @@ same rule is reported and decides nothing. The follow-ups:
 
 - ``run_region_check``: where, by region of the pre-op core, the fill gains or loses (``scaffold_regions``);
 - ``run_signal_check``: the post-op signal of the core across T1, T1ce, T2 and FLAIR (``core_signal``);
-- ``run_wall_check``: enhancement in a shell around the core (``core_signal.wall_enhancement``).
+- ``run_wall_check``: enhancement in a shell around the core (``core_signal.wall_enhancement``);
+- ``run_level_check``: the cavity level, dark against a level set by a supplied class (``cavity_level``).
 
 Records hold patient names: keep them private. Messages, summaries and tables name no patient.
 """
@@ -427,5 +428,73 @@ def run_wall_check(run_dir, lumiere_root, config, regions_record, out_dir, *, so
     return summary, table, record_path, digest
 
 
+def run_level_check(run_dir, config, regions_record, signals_record, out_path, *, source_run, expected, repo_root,
+                    progress=None):
+    """C4 follow-up 4 on LUMIERE: the cavity level (``cavity_level``) of every accepted training-role pair.
+
+    Same cohort checks as ``run_c4_lumiere``. ``regions_record`` (``run_region_check``) and ``signals_record``
+    (``run_signal_check``) must belong to the same split and hold exactly the accepted pairs. The class comes from the
+    signal record's post-op K3 z(T1); the class and pooled levels are leave one out within LUMIERE. Each pair's copy
+    and dark MAEs must equal the region record's within 1e-9. Only the exports are read, no atlas file. Writes one
+    write-once record (it names patients); returns ``(summary, table, path, sha256)``, both without names.
+    """
+    from .cavity_level import cavity_class, level_arms, level_summary, level_table, loo_levels, pair_levels
+
+    split, split_sha256, _ = verified_split(run_dir)
+    pairs, counts = accepted_training_pairs(run_dir, split, split_sha256)
+    if len(pairs) != expected:
+        raise ValueError(f"{len(pairs)} accepted training-role pairs, expected {expected}")
+    names = {sidecar["patient"] for _, sidecar in pairs}
+    for kind, record in (("region", regions_record), ("signal", signals_record)):
+        if record["source"]["split_sha256"] != split_sha256:
+            raise ValueError(f"The {kind} record belongs to another split")
+        if set(record["patients"]) != names:
+            raise ValueError(f"The {kind} record's pairs differ from the accepted pairs")
+    if Path(out_path).exists():
+        raise FileExistsError(f"{out_path} exists: use a new run tag")
+    regions, signals = regions_record["patients"], signals_record["patients"]
+    evaluation = config["evaluation"]
+
+    def load(path):
+        with np.load(path) as data:
+            arrays = {key: data[key] for key in data.files}
+        if "label" in arrays:
+            raise ValueError("A LUMIERE export holds a 'label' key; its post-op labels are unverified and are not read")
+        return arrays
+
+    rows = {}
+    for path, sidecar in pairs:  # pass 1: own levels and classes
+        patient = sidecar["patient"]
+        k3_z_t1 = (signals[patient].get("K3") or {}).get("z_t1")
+        rows[patient] = dict(pair_levels(load(path), evaluation), status=sidecar["resection"], k3_z_t1=k3_z_t1,
+                             **{"class": cavity_class(k3_z_t1)})
+    usable = {p: r for p, r in rows.items() if not r["na_reason"]}
+    levels = loo_levels({p: r["own_f"] for p, r in usable.items()}, {p: r["class"] for p, r in usable.items()})
+    for i, (path, sidecar) in enumerate(pairs, start=1):  # pass 2: the five arms
+        patient = sidecar["patient"]
+        row = rows[patient]
+        if row["na_reason"]:
+            continue
+        row.update(levels[patient])
+        row["mae"] = level_arms(load(path), evaluation, row, class_f=row["class_f"], pooled_f=row["pooled_f"])
+        for arm, key in (("copy", "copy_mae"), ("dark", "scaffold_mae")):
+            if abs(row["mae"][arm][0] - regions[patient][key]) > 1e-9:
+                raise ValueError(f"pair {i}: the {arm} MAE differs from the region record")
+        if progress:
+            progress(f"pair {i}/{len(pairs)} done")
+    summary = {"check": "C4 follow-up 4 on LUMIERE: the cavity level",
+               "source": {"run": source_run, "split_sha256": split_sha256[:12]}, "cohort": counts,
+               **level_summary(rows.values(), evaluation["bootstrap"])}
+    table = level_table(rows.values())
+    record = {"summary": summary, "patients": rows, "code": code_version(repo_root), "environment": environment(),
+              "config_sha256": {"EXP-2026-001": config_sha256(config)},
+              "source": {"run": source_run, "split_sha256": split_sha256},
+              "regions_record_source": regions_record["summary"].get("source"),
+              "signals_record_source": signals_record["summary"].get("source")}
+    record_path, digest = write_once_json(out_path, record)
+    return summary, table, record_path, digest
+
+
 __all__ = ["RESIDUAL_BY_RATING", "accepted_training_pairs", "check_pair", "file_sha256", "read_qc",
-           "run_c4_lumiere", "run_region_check", "run_signal_check", "run_wall_check", "summarize", "verified_split"]
+           "run_c4_lumiere", "run_level_check", "run_region_check", "run_signal_check", "run_wall_check", "summarize",
+           "verified_split"]
