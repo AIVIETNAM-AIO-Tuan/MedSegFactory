@@ -711,4 +711,4 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 
 - Decisions 8 and 9 approved; the adjacent-slice readout postponed.
 - Next: training-side code (image-only rows, loss contract, cache checks), then E-eval, then the notebooks, all with
-  CPU tests. The first Colab session is the smoke plus E0's E-eval.\n
+  CPU tests. The first Colab session is the smoke plus E0's E-eval.
