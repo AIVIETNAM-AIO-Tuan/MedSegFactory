@@ -95,6 +95,7 @@ BOTH_PROMPTS_DROP_RATE = 0.05
 EMPTY_PROMPT = ""
 MASK_CODEC_MAX_ID = 3
 CACHE_FORMAT = "EXP-2026-001-feature-cache-v1"
+EMPTY_PROMPT_TOLERANCE = 1e-3  # merge_caches: same encoder, other batch composition
 CHECKPOINT_FORMAT = "EXP-2026-001-checkpoint-v1"
 _CACHE_FIELDS = ("z_pre", "m_pre", "image_mean", "image_logvar", "mask_mean", "mask_logvar")
 
@@ -286,13 +287,17 @@ def merge_caches(labelled, image_only, *, cohort):
     if any(record.get("mask_available", True) is not False for record in image_only["patients"].values()):
         raise ValueError("The image-only cache holds an item with a mask")
     empty_a, empty_b = labelled["text"].get(EMPTY_PROMPT), image_only["text"].get(EMPTY_PROMPT)
-    if empty_a is None or empty_b is None or not torch.equal(empty_a, empty_b):
-        raise ValueError("The empty prompt's embedding differs between the caches")
+    if empty_a is None or empty_b is None or empty_a.shape != empty_b.shape:
+        raise ValueError("The empty prompt is missing from a cache or has another shape")
+    # The same frozen encoder gives the same embedding up to the last digits: on a GPU the batch it is encoded in
+    # changes the kernels. A different encoder differs far more. The merged cache keeps the labelled cache's one.
+    if not torch.allclose(empty_a, empty_b, rtol=EMPTY_PROMPT_TOLERANCE, atol=EMPTY_PROMPT_TOLERANCE):
+        raise ValueError("The empty prompt's embedding differs between the caches: another text encoder?")
     patients = {patient: dict(record, mask_available=True, cohort=cohort)
                 for patient, record in labelled["patients"].items()}
     patients.update(image_only["patients"])
     return dict(labelled, arm="TARGET_INFORMED_RECONSTRUCTION+IMAGE_ONLY", patients=patients,
-                text=dict(labelled["text"]))
+                text=dict(labelled["text"]), empty_prompt_max_difference=float((empty_a - empty_b).abs().max()))
 
 
 def train_step(unet, cache, items, noise_scheduler, *, rng, generator, stats=None):
