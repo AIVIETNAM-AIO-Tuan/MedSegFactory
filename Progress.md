@@ -706,3 +706,9 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - 18 findings verified and built into EXP-2026-007; no marker committed.
 - Open: decisions 8 and 9, and Claude's choices where the review asked for a definition (listed in the card).
 - Next: the researcher answers decisions 8 and 9. Then Claude implements round 1 with CPU tests.
+
+## 2026-11-25 - Card E fully approved; round 1 implementation started
+
+- Decisions 8 and 9 approved; the adjacent-slice readout postponed.
+- Next: training-side code (image-only rows, loss contract, cache checks), then E-eval, then the notebooks, all with
+  CPU tests. The first Colab session is the smoke plus E0's E-eval.\n

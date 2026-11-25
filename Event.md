@@ -1296,3 +1296,9 @@ after run r1.
   W7 share, the memorization alert, the seed comparator, the timing stratum.
 - Added for the researcher: decision 8 (value over the scaffold needs a lower bound above 0.01) and decision 9 (a
   smoke and E0's E-eval before the two trainings).
+
+## 2026-11-25 - EXP-2026-007 decisions 8 and 9 approved; implementation of round 1 starts
+
+- The researcher: "duyệt 8 và 9, chỉ số lát kề thì hoãn".
+- Decision 8: value over the scaffold needs a pooled gain whose 95% lower bound exceeds 0.01.
+- Decision 9: a mixed-batch smoke and E0's E-eval run in a first Colab session, before the two trainings.\n- Postponed: the readout of differences between adjacent generated slices (for EXP-2026-009's 2.5D question).\n
