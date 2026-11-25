@@ -1282,3 +1282,17 @@ after run r1.
 - Open: EXP-2026-009 decision 3 (thick-slice T1 as the target). The researcher raised making the model 2.5D.
 - Postponed until later results: the GPU check that the sampler carries a fill level; a text-control arm in E-eval;
   Stage 5 part 2; a cavity class in the mask; bundling E1's two edits; Package B.
+
+## 2026-11-25 - Codex's review of card E (E00 to E17) verified and built in; decisions 8 and 9 added
+
+- Codex reviewed EXP-2026-007 at the researcher's request, before any code. 18 findings, marked
+  `#commentfromcodex:` in the main-tree copy; the annotated copy is kept privately.
+- Claude checked each finding against the code and records. Each holds where it can be checked: `training_loss`
+  draws and noises every row; the joint attention takes the image half's queries from the mask half; the training
+  cache's prompts are target-derived; `build_feature_cache` has no role or hash check; `image_scores` drops
+  non-finite predictions; EXP-2026-001's promotion rule needs a lower CI above 0.01. Codex's numbers were recomputed.
+- Built into the card: a narrower claim, the starting weights and checkpoint rule, the mask-row and loss contract,
+  cache checks on load, scenario-only generation with an invariance test, the scoring and interval contract, the
+  W7 share, the memorization alert, the seed comparator, the timing stratum.
+- Added for the researcher: decision 8 (value over the scaffold needs a lower bound above 0.01) and decision 9 (a
+  smoke and E0's E-eval before the two trainings).

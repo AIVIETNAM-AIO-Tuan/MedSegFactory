@@ -700,3 +700,9 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   mask, bundling E1, Package B.
 - Next: the researcher asks Codex to review card E. Claude verifies the findings and builds them into the card,
   then implements round 1 with CPU tests.
+
+## 2026-11-25 - Card E revised after Codex's review
+
+- 18 findings verified and built into EXP-2026-007; no marker committed.
+- Open: decisions 8 and 9, and Claude's choices where the review asked for a definition (listed in the card).
+- Next: the researcher answers decisions 8 and 9. Then Claude implements round 1 with CPU tests.
