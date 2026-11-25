@@ -329,11 +329,12 @@ def alert_rate(results):
 def bank_from_grids(grids):
     """``(images float16 [N, H, W], support bool [N, H, W], index [(item, z)])`` from working grids.
 
-    Each grid holds ``post_image`` and ``post_support`` on the model grid. ``index`` names items: keep it private.
+    Each grid holds ``post_image`` and ``post_support`` on the model grid; a value may also be a function returning
+    the grid, so that only one item's grid is in memory at a time. ``index`` names items: keep it private.
     """
     images, support, index = [], [], []
     for item in sorted(grids):
-        grid = grids[item]
+        grid = grids[item]() if callable(grids[item]) else grids[item]
         images.append(torch.from_numpy(np.asarray(grid["post_image"], np.float32)).to(torch.float16))
         support.append(torch.from_numpy(np.asarray(grid["post_support"], bool)))
         index.extend((item, z) for z in range(len(grid["post_image"])))

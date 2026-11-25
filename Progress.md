@@ -712,3 +712,11 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - Decisions 8 and 9 approved; the adjacent-slice readout postponed.
 - Next: training-side code (image-only rows, loss contract, cache checks), then E-eval, then the notebooks, all with
   CPU tests. The first Colab session is the smoke plus E0's E-eval.
+
+## 2026-11-25 - EXP-2026-007 round 1 implemented
+
+- Code, configs and two notebooks on the fork; 28 new local tests, 15 of 15 planted defects caught; dry runs of
+  the notebooks' code on CPU passed.
+- Next: the researcher runs the first session, `notebooks/RHUH_GBM_Colab_e_series_eval.ipynb` with `MODEL = "E0"`
+  and `SMOKE_FIRST = True` (G4, about 1 to 1.5 hours), and sends the `SMOKE` and `SUMMARY` blocks. The trainings
+  start only after it passes (decision 9).

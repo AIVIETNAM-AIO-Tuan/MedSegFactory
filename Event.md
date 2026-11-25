@@ -1303,3 +1303,16 @@ after run r1.
 - Decision 8: value over the scaffold needs a pooled gain whose 95% lower bound exceeds 0.01.
 - Decision 9: a mixed-batch smoke and E0's E-eval run in a first Colab session, before the two trainings.
 - Postponed: the readout of differences between adjacent generated slices (for EXP-2026-009's 2.5D question).
+
+## 2026-11-25 - EXP-2026-007 round 1 implemented (CPU tests); first Colab session ready
+
+- Code: the noise-partner loss contract in `model.training_loss`, image-only caches and per-cohort statistics in
+  `training`, `working_grid.to_image_only_grid`, `e_series` (membership, lineage, guards) and `e_eval` (E-eval and
+  the frozen decision rules), `configs/experiments/EXP-2026-007.json`.
+- Notebooks: `RHUH_GBM_Colab_e_series_eval.ipynb` (first session: `MODEL = "E0"`, `SMOKE_FIRST = True`) and
+  `RHUH_GBM_Colab_e_series_train.ipynb` (E0s, E3m).
+- Tests (local only): 28 new, all passed; 196 passed with the related suites; 15 of 15 planted defects caught.
+  Static checks and CPU dry runs of the notebooks' own code passed. Not run on Colab yet.
+- Card detail added: E3m's logged total loss is about 0.745 times r2's for the same row errors, so only per-cohort
+  row losses are compared. The step-0 check is the author checkpoint's SHA-256 against r2's record, plus a recorded
+  state hash shared by E0s and E3m (r2 recorded none).
