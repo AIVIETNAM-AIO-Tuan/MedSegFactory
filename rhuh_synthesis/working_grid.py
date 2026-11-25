@@ -76,6 +76,26 @@ def to_working_grid(arrays, *, crop_mm=SELECTED["crop_mm"], out_px=SELECTED["out
     return crop, grid
 
 
+def to_image_only_grid(arrays, *, crop_mm=SELECTED["crop_mm"], out_px=SELECTED["out_px"]):
+    """``(crop, grid_arrays)`` of an export without a trusted post-op mask (EXP-2026-007 image-only items).
+
+    The same rules as ``to_working_grid`` for ``pre_image``, ``post_image``, ``pre_label`` and ``pre_foreground``.
+    No post-op label is read or produced: an export holding ``label`` is refused, and ``post_label_unverified`` is
+    ignored.
+    """
+    if "label" in arrays:
+        raise ValueError("An image-only export must not hold 'label'")
+    crop = make_crop_map(arrays["pre_foreground"], crop_mm=crop_mm, out_px=out_px)
+    grid = {
+        "pre_image": np.clip(crop_image(arrays["pre_image"], crop), 0.0, 1.0),
+        "post_image": np.clip(crop_image(arrays["post_image"], crop), 0.0, 1.0),
+        "pre_label": crop_forward(np.asarray(arrays["pre_label"]), crop).astype(np.uint8),
+        "pre_foreground": crop_forward(np.asarray(arrays["pre_foreground"]).astype(np.uint8), crop).astype(bool),
+        "excluded_foreground_voxels": crop["excluded_foreground_voxels"],
+    }
+    return crop, grid
+
+
 def labels_back(slices, crop, frame_hw):
     """Crop-grid labels -> 1 mm frame labels (preregistered most-frequent-ID rule)."""
     return crop_back(slices, crop, frame_hw)

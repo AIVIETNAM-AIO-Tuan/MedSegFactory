@@ -1,0 +1,39 @@
+{
+  "experiment_id": "EXP-2026-007",
+  "config_version": 1,
+  "note": "Training series E, round 1. Frozen with the card experiments/registry/EXP-2026-007.md (approved 2026-11-25, decisions 1 to 9, after Codex's review E00 to E17). The EXP-2026-001 blocks (representation, text, training, sampling, evaluation) and the EXP-2026-008 D2 config (starts, tolerances) are read from their own files and are not copied here.",
+  "parents": {
+    "exp001_config": "configs/experiments/EXP-2026-001.json",
+    "d2_config": "configs/experiments/EXP-2026-008_d2.json"
+  },
+  "runs": {
+    "E0": {"training": "none", "weights": {"stage5_run_tag": "r2", "record": "record.json"}},
+    "E0s": {"training": "r2 recipe", "train_seed": 2027, "cohorts": ["RHUH"]},
+    "E3m": {"training": "r2 recipe", "train_seed": 2026, "cohorts": ["RHUH", "LUMIERE"]}
+  },
+  "training": {
+    "start": "r2's step-0 weights: the author checkpoint (its SHA-256 equal to r2's record) widened 4 to 11 by model.expand_conv_in, and a fresh AdamW state",
+    "evaluated_checkpoint_step": 1000,
+    "cohort_stats": true,
+    "lumiere_rows": "image-only: empty prompts; the mask row is the drawn noise at timestep 999 with loss weight 0; mean over all 2B rows"
+  },
+  "lumiere_source": {
+    "drive": ["LUMIERE_derived", "EXP-2026-005", "r2"],
+    "run": "EXP-2026-005 run r2",
+    "expected_train_accepted": 25,
+    "expected_development_accepted": 4
+  },
+  "evaluation": {
+    "recipe": "W4 of EXP-2026-008 at start 501 on every axial slice that touches E",
+    "seeds": [11, 22, 33],
+    "batch_pairs": 6,
+    "expected_heldout": {"RHUH": 3, "LUMIERE": 4},
+    "labels": "V1 to V3 for RHUH validation, V4 to V7 for LUMIERE development, each in sorted ID order",
+    "heldout_loss": {"timesteps": [100, 300, 500], "noise_seed": 20261125, "partner_timestep": 999, "batch": 4},
+    "w7": {"slab_slices": 12, "scenario_seed_base": 2026, "n_pieces": 2, "volume_ml": 0.8},
+    "memorization": {"threshold": 0.95, "min_voxels": 100, "candidate_chunk": 512},
+    "bootstrap": {"resamples": 10000, "seed": 20261103, "stratified_by": "cohort"},
+    "guardrail": {"ml": 0.01, "min_seeds": 2},
+    "meaningful_delta": 0.01
+  }
+}

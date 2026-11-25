@@ -244,8 +244,21 @@ def training_loss(
     mask_text_emb,
     noise_scheduler,
     generator=None,
+    mask_available=None,
+    row_losses=None,
 ):
     """Reference diffusion-noise MSE for one batch of B paired post-op slices.
+
+    EXP-2026-007 additions (both optional; without them the computation is the reference one, unchanged):
+
+    - ``mask_available``: B booleans. A pair without a trusted post-op mask (an image-only item) keeps its image row
+      as is. Its mask row becomes a pure-noise partner: after the usual draws, its noisy input is replaced by the
+      noise drawn for that row and its timestep by the last one (999), and its loss weight is 0. No extra random
+      draw is made. The loss is then the weighted mean over all 2B rows, the weight-0 rows counted in the
+      denominator, so each active row keeps the reference per-row factor. If every value is True, the reference
+      code path runs unchanged.
+    - ``row_losses``: a list; the detached per-row mean squared errors ``[2B]`` (float32, CPU) are appended, for
+      logging only. The returned loss does not depend on it.
 
     Follows ``tutorial_train.py``: the scaled post-op image and mask latents
     (in the reference ``vae.encode(x).latent_dist.sample() * scaling_factor``,
@@ -294,6 +307,11 @@ def training_loss(
         device=draw_device,
     ).to(latents.device).long()
     noisy = noise_scheduler.add_noise(latents, noise, timesteps)
+    absent = _absent_mask_rows(mask_available, batch, latents.device)
+    if absent is not None:
+        noisy, timesteps = noisy.clone(), timesteps.clone()
+        noisy[absent] = noise[absent]
+        timesteps[absent] = noise_scheduler.config.num_train_timesteps - 1
 
     model_input = stack_unet_input(noisy[:batch], noisy[batch:], z_pre, m_pre)
     _check_unet_io(unet, model_input.shape[1], latents.shape[1])
@@ -303,7 +321,26 @@ def training_loss(
     )[0]
     if noise_pred.shape != noise.shape:
         raise ValueError(f"UNet output {tuple(noise_pred.shape)} != noise {tuple(noise.shape)}")
-    return F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
+    if row_losses is not None:
+        row_losses.append((noise_pred.detach().float() - noise.float()).pow(2).mean(dim=(1, 2, 3)).cpu())
+    if absent is None:
+        return F.mse_loss(noise_pred.float(), noise.float(), reduction="mean")
+    weights = torch.ones(latents.shape[0], device=noise_pred.device, dtype=torch.float32)
+    weights[absent] = 0.0
+    squared = (noise_pred.float() - noise.float()).pow(2)
+    return (squared * weights.view(-1, 1, 1, 1)).sum() / squared.numel()
+
+
+def _absent_mask_rows(mask_available, batch, device):
+    """Row indices ``[B..2B)`` of the mask rows without a target, or None when every mask is available."""
+    if mask_available is None:
+        return None
+    available = torch.as_tensor(mask_available)
+    if available.dtype != torch.bool or available.shape != (batch,):
+        raise ValueError(f"mask_available must hold {batch} booleans, got {tuple(available.shape)} {available.dtype}")
+    if bool(available.all()):
+        return None
+    return (torch.nonzero(~available).flatten() + batch).to(device)
 
 
 def reference_ddim_scheduler():

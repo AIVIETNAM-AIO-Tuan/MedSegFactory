@@ -211,7 +211,91 @@ def build_feature_cache(
     }
 
 
-def train_step(unet, cache, items, noise_scheduler, *, rng, generator):
+def build_image_only_cache(exports, vae, encode_text, *, cohort, batch=16, device="cpu"):
+    """Feature cache of image-only items (EXP-2026-007): exports with a post-op image and no trusted post-op mask.
+
+    ``exports`` maps item -> working-grid ``pre_image``, ``pre_label`` and ``post_image`` [Z, H, W]. A ``label`` key
+    is refused, so a mask can never be read here. Each record holds ``z_pre``, ``m_pre``, ``image_mean`` and
+    ``image_logvar`` as in ``build_feature_cache``, ``mask_available: False``, ``cohort``, ``slices`` (Z) and no
+    prompt: both prompts of an image-only item are the empty one. Merge with a labelled cache by ``merge_caches``.
+    """
+    batch = operator.index(batch)
+    if batch < 1:
+        raise ValueError(f"batch must be >= 1, got {batch}")
+    if not exports:
+        raise ValueError("No image-only items")
+    if not isinstance(cohort, str) or not cohort:
+        raise ValueError("cohort must name the items' dataset")
+    dtype = next(vae.parameters()).dtype
+    patients = {}
+    with torch.no_grad():
+        for patient in sorted(exports):
+            arrays = _checked_image_only(patient, exports[patient])
+            chunks = {name: [] for name in ("z_pre", "m_pre", "image_mean", "image_logvar")}
+            for start in range(0, len(arrays["post_image"]), batch):
+                part = {name: value[start : start + batch] for name, value in arrays.items()}
+                pre = torch.from_numpy(np.ascontiguousarray(part["pre_image"], dtype=np.float32))[:, None]
+                chunks["z_pre"].append(encode_pre_image(vae, pre).float().cpu())
+                chunks["m_pre"].append(mask_fractions(part["pre_label"]))
+                x = torch.from_numpy(np.ascontiguousarray(encode_image(part["post_image"]))).to(device=device, dtype=dtype)
+                posterior = vae.encode(x).latent_dist
+                chunks["image_mean"].append(posterior.mean.float().cpu())
+                chunks["image_logvar"].append(posterior.logvar.float().cpu())
+            record = {name: torch.cat(parts) for name, parts in chunks.items()}
+            if len({tuple(record[name].shape[2:]) for name in record}) != 1:
+                raise ValueError(f"{patient}: latent grids disagree")
+            record.update(mask_available=False, cohort=cohort, slices=len(arrays["post_image"]))
+            patients[patient] = record
+        embedding = encode_text([EMPTY_PROMPT])
+        if not torch.is_tensor(embedding) or embedding.ndim != 3 or embedding.shape[0] != 1:
+            raise ValueError("encode_text must return [N=1, seq, dim]")
+    return {
+        "format": CACHE_FORMAT,
+        "arm": "IMAGE_ONLY",
+        "scaling_factor": float(vae.config.scaling_factor),
+        "text": {EMPTY_PROMPT: embedding[0].detach().to("cpu", torch.float32).clone()},
+        "patients": patients,
+    }
+
+
+def image_only_pools(cache):
+    """Slice pools of image-only items: every slice in one pool, so ``SliceSampler`` draws them uniformly."""
+    return {patient: {"positive": [], "negative": list(range(record["slices"]))}
+            for patient, record in cache["patients"].items() if record.get("mask_available", True) is False}
+
+
+def merge_caches(labelled, image_only, *, cohort):
+    """One training cache: a ``build_feature_cache`` result (its records tagged ``cohort``) plus image-only items.
+
+    Refuses differing formats or scaling factors, a shared item, or an empty prompt whose embedding differs. With
+    ``image_only=None`` the labelled cache is only tagged (a run without image-only items, such as E0s).
+    """
+    if image_only is None:
+        if labelled.get("format") != CACHE_FORMAT:
+            raise ValueError("Not a feature cache")
+        patients = {patient: dict(record, mask_available=True, cohort=cohort)
+                    for patient, record in labelled["patients"].items()}
+        return dict(labelled, patients=patients, text=dict(labelled["text"]))
+    if labelled.get("format") != CACHE_FORMAT or image_only.get("format") != CACHE_FORMAT:
+        raise ValueError("Both caches must be feature caches of the same format")
+    if labelled["scaling_factor"] != image_only["scaling_factor"]:
+        raise ValueError("The caches used different VAE scaling factors")
+    shared = set(labelled["patients"]) & set(image_only["patients"])
+    if shared:
+        raise ValueError(f"{len(shared)} item(s) are in both caches")
+    if any(record.get("mask_available", True) is not False for record in image_only["patients"].values()):
+        raise ValueError("The image-only cache holds an item with a mask")
+    empty_a, empty_b = labelled["text"].get(EMPTY_PROMPT), image_only["text"].get(EMPTY_PROMPT)
+    if empty_a is None or empty_b is None or not torch.equal(empty_a, empty_b):
+        raise ValueError("The empty prompt's embedding differs between the caches")
+    patients = {patient: dict(record, mask_available=True, cohort=cohort)
+                for patient, record in labelled["patients"].items()}
+    patients.update(image_only["patients"])
+    return dict(labelled, arm="TARGET_INFORMED_RECONSTRUCTION+IMAGE_ONLY", patients=patients,
+                text=dict(labelled["text"]))
+
+
+def train_step(unet, cache, items, noise_scheduler, *, rng, generator, stats=None):
     """Reference loss for one microbatch of sampler draws; no optimizer step.
 
     ``items`` are ``SliceSampler`` draws ``(patient, z, pool)`` (``pool`` is
@@ -230,6 +314,11 @@ def train_step(unet, cache, items, noise_scheduler, *, rng, generator):
 
     Inputs move to the UNet's device/dtype. Returns the scalar loss; its graph
     reaches only ``unet`` (cached features carry no history).
+
+    Image-only items (``mask_available: False``, EXP-2026-007) make no numpy draw: both prompts are empty. Their
+    mask latents are zeros, never read, because ``training_loss`` replaces that row by a pure-noise partner with
+    weight 0. The torch draws keep their shapes. A microbatch of labelled items only runs the reference path. With
+    ``stats`` (a dict), per-cohort counts and the detached row losses are added to it (``add_cohort_stats``).
     """
     _check_generator(generator)
     items = list(items)
@@ -237,19 +326,31 @@ def train_step(unet, cache, items, noise_scheduler, *, rng, generator):
         raise ValueError("items must contain at least one sampler draw")
     records, text = cache["patients"], cache["text"]
     picked = {name: [] for name in _CACHE_FIELDS}
-    image_embeddings, mask_embeddings = [], []
+    image_embeddings, mask_embeddings, available, cohorts, dropped = [], [], [], [], []
     for patient, z, _pool in items:
         record = records[patient]
         z = operator.index(z)
-        if not 0 <= z < len(record["prompts"]):
-            raise ValueError(f"{patient}: slice {z} outside 0..{len(record['prompts']) - 1}")
-        variants = record["prompts"][z]
-        image_prompt, mask_prompt = variants[int(rng.integers(len(variants)))]
-        drop_image, drop_mask = text_dropout(rng)
+        has_mask = record.get("mask_available", True) is not False
+        slices = len(record["prompts"]) if has_mask else record["slices"]
+        if not 0 <= z < slices:
+            raise ValueError(f"{patient}: slice {z} outside 0..{slices - 1}")
+        if has_mask:
+            variants = record["prompts"][z]
+            image_prompt, mask_prompt = variants[int(rng.integers(len(variants)))]
+            drop_image, drop_mask = text_dropout(rng)
+        else:
+            image_prompt = mask_prompt = EMPTY_PROMPT
+            drop_image = drop_mask = True
         image_embeddings.append(text[EMPTY_PROMPT if drop_image else image_prompt])
         mask_embeddings.append(text[EMPTY_PROMPT if drop_mask else mask_prompt])
+        available.append(has_mask)
+        cohorts.append(record.get("cohort", "unlabelled"))
+        dropped.append((drop_image or image_prompt == EMPTY_PROMPT, drop_mask or mask_prompt == EMPTY_PROMPT))
         for name in _CACHE_FIELDS:
-            picked[name].append(record[name][z])
+            if has_mask or name in ("z_pre", "m_pre", "image_mean", "image_logvar"):
+                picked[name].append(record[name][z])
+            else:
+                picked[name].append(torch.zeros_like(record["image_mean"][z]))
 
     reference = next(unet.parameters())
     device, dtype = reference.device, reference.dtype
@@ -259,7 +360,13 @@ def train_step(unet, cache, items, noise_scheduler, *, rng, generator):
     eps = randn_tensor(mean.shape, generator=generator, device=device, dtype=mean.dtype)
     latents = ((mean + torch.exp(0.5 * logvar) * eps) * cache["scaling_factor"]).to(dtype)
     count = len(items)
-    return training_loss(
+    extra = {}
+    if not all(available):
+        extra["mask_available"] = torch.tensor(available, dtype=torch.bool)
+    rows = [] if stats is not None else None
+    if rows is not None:
+        extra["row_losses"] = rows
+    loss = training_loss(
         unet,
         latents[:count],
         latents[count:],
@@ -269,7 +376,30 @@ def train_step(unet, cache, items, noise_scheduler, *, rng, generator):
         torch.stack(mask_embeddings).to(device=device, dtype=dtype),
         noise_scheduler,
         generator=generator,
+        **extra,
     )
+    if stats is not None:
+        add_cohort_stats(stats, cohorts, available, dropped, rows[0])
+    return loss
+
+
+def add_cohort_stats(stats, cohorts, available, dropped, row_losses):
+    """Accumulate per-cohort exposure and loss sums (Codex E05) into ``stats``, a plain dict of dicts."""
+    count = len(cohorts)
+    for k, cohort in enumerate(cohorts):
+        entry = stats.setdefault(cohort, {"items": 0, "empty_image_prompt": 0, "empty_mask_prompt": 0,
+                                          "noise_partner": 0, "image_loss_sum": 0.0, "mask_loss_sum": 0.0,
+                                          "mask_rows": 0})
+        entry["items"] += 1
+        entry["empty_image_prompt"] += int(dropped[k][0])
+        entry["empty_mask_prompt"] += int(dropped[k][1])
+        entry["image_loss_sum"] += float(row_losses[k])
+        if available[k]:
+            entry["mask_loss_sum"] += float(row_losses[count + k])
+            entry["mask_rows"] += 1
+        else:
+            entry["noise_partner"] += 1
+    return stats
 
 
 def save_checkpoint(path, *, unet, optimizer, step, sampler, rng, generator, config_sha256, scaler=None):
@@ -371,8 +501,12 @@ def train(
     config_sha256="",
     start_step=0,
     precision="fp32",
+    cohort_stats=False,
 ):
     """Run ``steps`` optimizer steps after ``start_step``; return the final global step.
+
+    With ``cohort_stats``, each log line also holds ``"cohorts"``: that step's per-cohort counts and loss sums
+    (``add_cohort_stats``). Without it the log lines are the reference ones.
 
     ``precision="bf16"`` wraps each microbatch's forward pass and loss (not the
     backward pass or the optimizer) in bf16 autocast; bf16 needs no scaler.
@@ -412,10 +546,12 @@ def train(
         current = step + 1
         optimizer.zero_grad(set_to_none=True)
         losses = []
+        stats = {} if cohort_stats else None
         for _ in range(accumulation):
             with torch.autocast(device_type=device_type, dtype=torch.bfloat16, enabled=precision == "bf16"):
                 loss = train_step(
-                    unet, cache, sampler.batch(microbatch), noise_scheduler, rng=rng, generator=generator
+                    unet, cache, sampler.batch(microbatch), noise_scheduler, rng=rng, generator=generator,
+                    **({} if stats is None else {"stats": stats}),
                 )
             value = float(loss.detach())
             if not math.isfinite(value):
@@ -425,7 +561,10 @@ def train(
             losses.append(value)
         optimizer.step()
         step = current
-        _append_json_line(log_path, {"step": step, "loss": sum(losses) / accumulation, "finite": True})
+        line = {"step": step, "loss": sum(losses) / accumulation, "finite": True}
+        if stats is not None:
+            line["cohorts"] = stats
+        _append_json_line(log_path, line)
         if checkpoint_every is not None and step % checkpoint_every == 0:
             save_checkpoint(
                 Path(checkpoint_dir) / f"checkpoint-{step:06d}.pt",
@@ -449,6 +588,22 @@ def _checked_export(patient, arrays):
     for name in ("pre_label", "label"):
         if checked[name].dtype.kind not in "iu":
             raise ValueError(f"{patient}: {name} must hold integer IDs, got {checked[name].dtype}")
+    post = checked["post_image"]
+    if not np.isfinite(post).all() or post.min() < 0.0 or post.max() > 1.0:
+        raise ValueError(f"{patient}: post_image must be finite and lie in [0, 1]")
+    return checked
+
+
+def _checked_image_only(patient, arrays):
+    if "label" in arrays:
+        raise ValueError(f"{patient}: an image-only item must not carry a 'label' key")
+    names = ("pre_image", "pre_label", "post_image")
+    checked = {name: np.asarray(arrays[name]) for name in names}
+    shapes = {value.shape for value in checked.values()}
+    if len(shapes) != 1 or checked["post_image"].ndim != 3 or len(checked["post_image"]) < 1:
+        raise ValueError(f"{patient}: {names} must share one [Z >= 1, H, W] shape, got {shapes}")
+    if checked["pre_label"].dtype.kind not in "iu":
+        raise ValueError(f"{patient}: pre_label must hold integer IDs, got {checked['pre_label'].dtype}")
     post = checked["post_image"]
     if not np.isfinite(post).all() or post.min() < 0.0 or post.max() > 1.0:
         raise ValueError(f"{patient}: post_image must be finite and lie in [0, 1]")
