@@ -1316,3 +1316,13 @@ after run r1.
 - Card detail added: E3m's logged total loss is about 0.745 times r2's for the same row errors, so only per-cohort
   row losses are compared. The step-0 check is the author checkpoint's SHA-256 against r2's record, plus a recorded
   state hash shared by E0s and E3m (r2 recorded none).
+
+## 2026-11-25 - EXP-2026-007 E0s trained (before the first session: a deviation from decision 9)
+
+- Run `E0s_r1` (Colab G4, commit e3ac7ee): 1,000 steps, finite losses, 4 files confirmed by MD5. Same author
+  checkpoint as r2, 24 RHUH members, 3,720 slices, 20,000 draws; training loss close to r2's (last 50 steps 0.0275
+  against 0.0265), 2,259 s, peak 64.9 GiB.
+- The researcher ran it before the smoke and E0's E-eval. E0s uses only the reference path, so the run is kept;
+  the smoke still precedes E3m's training.
+- Also: the E-eval notebook now says which of MODEL, TRAIN_TAG and SMOKE_FIRST to change when they disagree
+  (ab57dbb), after the researcher hit that check.

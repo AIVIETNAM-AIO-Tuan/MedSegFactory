@@ -720,3 +720,9 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - Next: the researcher runs the first session, `notebooks/RHUH_GBM_Colab_e_series_eval.ipynb` with `MODEL = "E0"`
   and `SMOKE_FIRST = True` (G4, about 1 to 1.5 hours), and sends the `SMOKE` and `SUMMARY` blocks. The trainings
   start only after it passes (decision 9).
+
+## 2026-11-25 - E0s trained
+
+- `E0s_r1` done and confirmed on Drive; numbers in EXP-2026-007's run evidence.
+- Next: the first session (E-eval notebook, `MODEL = "E0"`, `SMOKE_FIRST = True`), then E3m's training, then the
+  E-evals of E0s and E3m.
