@@ -24,6 +24,7 @@ scan, so they are target-informed and describe; they decide nothing. Nothing her
 """
 
 import hashlib
+from pathlib import Path
 
 import numpy as np
 
@@ -64,26 +65,36 @@ def classify(z_t1, z_t1ce, z_t2, enhancement):
     return str(names) if names.ndim == 0 else names
 
 
-def sequences_in_frame(paths, sidecar):
+def visit_files(t1ce_path, names=SEQUENCES):
+    """The processed visit's files for ``names``, named like its T1ce file (``<stem>_t1ce.nii.gz``)."""
+    t1ce_path = Path(t1ce_path)
+    if not t1ce_path.name.endswith("_t1ce.nii.gz"):
+        raise ValueError("The T1ce file name does not end in _t1ce.nii.gz")
+    stem = t1ce_path.name[: -len("_t1ce.nii.gz")]
+    return {name: t1ce_path.with_name(f"{stem}_{name}.nii.gz") for name in names}
+
+
+def sequences_in_frame(paths, sidecar, names=SEQUENCES):
     """``{name: (image [Z, Y, X] float32, foreground [Z, Y, X] bool)}`` of one post-op visit in the export frame.
 
-    ``paths`` maps each name in ``SEQUENCES`` to that visit's file. The files must share one grid. Each is moved with
-    the sidecar's ``registration.matrix_ras`` into its ``frame``, linear for the image (filled with the file's border
-    background) and nearest for the foreground (voxels that differ from that background), as T1ce was.
+    ``paths`` maps each of ``names`` (all of ``SEQUENCES`` by default) to that visit's file. The files must share one
+    grid. Each is moved with the sidecar's ``registration.matrix_ras`` into its ``frame``, linear for the image (filled
+    with the file's border background) and nearest for the foreground (voxels that differ from that background), as
+    T1ce was.
     """
-    missing = [name for name in SEQUENCES if name not in paths]
+    missing = [name for name in names if name not in paths]
     if missing:
         raise ValueError(f"Missing sequences: {missing}")
     frame_shape = tuple(int(n) for n in sidecar["frame"]["shape_xyz"])
     frame_affine = np.asarray(sidecar["frame"]["affine_ras"], float)
     matrix = np.asarray(sidecar["registration"]["matrix_ras"], float)
     out, grid = {}, None
-    for name in SEQUENCES:
+    for name in names:
         image, affine = load_xyz(paths[name])
         if grid is None:
             grid = (image.shape, affine)
         elif image.shape != grid[0] or not np.allclose(affine, grid[1], atol=1e-4):
-            raise ValueError(f"{name}: its grid differs from the visit's {SEQUENCES[0]}")
+            raise ValueError(f"{name}: its grid differs from the visit's {names[0]}")
         background = border_background(image)
         if background is None:
             raise ValueError(f"{name}: no constant border background")
