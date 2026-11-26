@@ -106,11 +106,11 @@ def _slab_support(arrays, inputs, crop):
     return support, support & ~inputs["image_region"]
 
 
-def score_volume(arrays, inputs, stack_path, evaluation, *, crop_mm, out_px, round_trip_outside_e, tolerances):
-    """Scores of one saved W4 stack: the composed full frame against the real post-op scan, guardrail and drift.
+def composed_volume(arrays, inputs, stack_path, *, crop_mm, out_px):
+    """``(full image, full label, frame images, crop)`` of one saved W4 stack, as scored.
 
-    Raises FloatingPointError if the composed frame holds a non-finite value (Codex E13): a missing prediction
-    never shrinks the scored region.
+    The generated slices are mapped back to the frame, composed with the scaffold and the empty start mask, and
+    spliced into the full-volume scaffold; every other slice stays the scaffold.
     """
     crop = make_crop_map(arrays["pre_foreground"], crop_mm=crop_mm, out_px=out_px)
     frame_hw = tuple(np.asarray(arrays["pre_label"]).shape[1:])
@@ -121,6 +121,43 @@ def score_volume(arrays, inputs, stack_path, evaluation, *, crop_mm, out_px, rou
     zs = slice(inputs["slab_start"], inputs["slab_start"] + inputs["slices"])
     full_image, full_mask = inputs["full"]["scaffold"].copy(), inputs["full"]["start_empty"].copy()
     full_image[zs], full_mask[zs] = image, mask
+    return full_image, full_mask, frame_images, crop
+
+
+def mask_dice_rows(model, record, arrays_of, stack_of, *, crop_mm, out_px):
+    """Exploratory (2026-11-27): the composed W4 label of each RHUH patient against its real post-op label.
+
+    Per seed, Dice and volumes per class inside the observed support (``mask_scaffold_check.class_scores``), with the
+    scaffold's no-residual label beside it. ``arrays_of(label)`` loads the patient's export and ``stack_of(label,
+    seed)`` gives a local path of the saved W4 stack. Rows carry the V labels only. W4 asks for no residual, so the
+    enhancing class compares a no-residual scenario with the real outcome.
+    """
+    from .mask_scaffold_check import class_scores, rule_label
+
+    rows = []
+    for label, entry in sorted(record["patients"].items()):
+        if entry["cohort"] != "RHUH":
+            continue
+        arrays = arrays_of(label)
+        inputs = volume_inputs(arrays)
+        support, ref = np.asarray(arrays["post_support"], bool), np.asarray(arrays["label"])
+        by_seed = {}
+        for seed in record["seeds"]:
+            _, full_mask, _, _ = composed_volume(arrays, inputs, stack_of(label, seed), crop_mm=crop_mm, out_px=out_px)
+            by_seed[str(seed)] = class_scores(full_mask, ref, support, inputs["spacing"])
+        rows.append({"kind": "mask_dice", "model": model, "label": label, "cohort": "RHUH", "by_seed": by_seed,
+                     "scaffold_rule": class_scores(rule_label(arrays["pre_label"]), ref, support, inputs["spacing"])})
+    return rows
+
+
+def score_volume(arrays, inputs, stack_path, evaluation, *, crop_mm, out_px, round_trip_outside_e, tolerances):
+    """Scores of one saved W4 stack: the composed full frame against the real post-op scan, guardrail and drift.
+
+    Raises FloatingPointError if the composed frame holds a non-finite value (Codex E13): a missing prediction
+    never shrinks the scored region.
+    """
+    full_image, full_mask, frame_images, crop = composed_volume(arrays, inputs, stack_path, crop_mm=crop_mm,
+                                                                out_px=out_px)
     if not np.isfinite(full_image).all():
         raise FloatingPointError(f"{np.size(full_image) - np.isfinite(full_image).sum()} non-finite composed voxels")
     scores = image_scores(full_image, arrays, evaluation)
