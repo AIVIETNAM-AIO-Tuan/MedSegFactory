@@ -750,3 +750,11 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   scaffold in the primary region: most of the paired error is the scan-to-scan floor, not the surgery.
 - The edema zone is not special (1.23 times the floor). This supports moving the primary endpoint away from paired
   MAE (the researcher's decision for the next card).
+
+## 2026-11-27 - EXP-2026-007 records read
+
+- Smoke verified. In W4 the model draws no label at all; the labels come from the scenario.
+- E3m keeps three times more of W7's requested pieces at the same precision (not attributed; image side unread).
+  Its held-out image loss gain is real (3 to 9 times the seed noise), but its primary MAE is not lower.
+- Next: the researcher chooses the next card. Claude's proposal: judge the learned renderer on label-image
+  consistency (T1ce contrast at the scenario's pieces) and on rET segmentation, not on paired MAE.

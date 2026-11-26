@@ -1374,3 +1374,16 @@ after run r1.
 - Shares of the primary region and of its error: margin within 10 mm outside the labels 61% and 61%, pre-op edema
   zone 22% and 18%, core 11% and 13%, ramp 6% and 7%. Edema-zone MAE is 1.23 times the floor (margin 1.18).
 - So a perfect edema rendering could lower the primary MAE by roughly 0.005 at most. Descriptive and post hoc.
+
+## 2026-11-27 - EXP-2026-007 records read: smoke passed; W4 draws no label; W7 and loss details
+
+- The researcher ran the readout cell (commit 93d0483). Aggregates are in card E; values stay private.
+- The smoke passed (finite losses and gradients, partner rows at t = 999, weights unchanged), so decision 9's order
+  held for E3m.
+- W4: for E0, E0s and E3m, on all 3 RHUH patients and all seeds, the generated label is empty. The mask stream keeps
+  its empty start and draws no edema, so the no-enhancing guardrail cannot fail in W4.
+- W7, mean of 3: E3m keeps 0.36 of the pieces (E0 0.11, E0s 0.10), at the same precision (0.82), with Dice 0.50
+  against 0.19. A weaker mask prior could explain it (mask loss +11%), so it is not attributed.
+- E3m's held-out image loss against E0: -3.0% on RHUH and -8.8% on LUMIERE, while E0s stays within 1.2%.
+- On the 7 held-out patients, the stable-region floor (median 0.059) is about half of the scaffold's primary MAE (0.114).
+- Memorization alerts recur at the same edge slices across models and seeds, and on the copy too.
