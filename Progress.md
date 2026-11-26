@@ -736,3 +736,10 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   - Read the three E-eval records: the smoke, E0's held-out losses, W7's precision and off-piece volume, and the
     memorization matches.
   - Then the researcher decides round 2's primary endpoint, or whether round 2 runs at all.
+
+## 2026-11-27 - Exploratory mask Dice of the scaffold's label
+
+- The pre-op edema kept by the scaffold matches the post-op edema with Dice median 0.45 and overstates it by 26 ml
+  (median). The no-residual rule is right on 19 of 27 patients and misses residuals of 0.2 to 1.8 ml in the other 8.
+- About a fifth of the real residual lies just outside the pre-op core, where the residual rule cannot place pieces.
+- Next: the researcher decides the next card (the evaluation hierarchy and its primary endpoint).

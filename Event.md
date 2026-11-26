@@ -1349,3 +1349,18 @@ after run r1.
   - 6ffbe27: the empty-prompt check compared bit for bit.
 - Two failed E3m starts came from a stale laptop copy of the training notebook. The copy now matches the fork.
 - Not verified: the smoke's result, which is stored in E0's record.
+
+## 2026-11-27 - Exploratory: Dice of rule-based post-op labels against real RHUH labels
+
+- Asked by the researcher. Read-only, on the CPU, over 27 accepted RHUH patients (24 training, 3 validation); the test
+  set was not touched. Code in commit 78080e2; per-patient rows stay private.
+- Edema kept from the pre-op label: Dice median 0.45 (IQR 0.27 to 0.52) against the post-op edema label. The pre-op
+  edema is larger by a median of 26 ml.
+- Enhancing tumor:
+  - the no-residual rule is right on the 19 patients without residual (0 ml false positive) and misses the residual
+    of the other 8 (median 0.54 ml);
+  - the pre-op enhancing label used as a copy overlaps the residual with Dice median 0.02, and adds a median 14 ml
+    of false positive where there is no residual.
+- Where the real residual lies (8 patients): a median 78% inside the pre-op core, where the residual rule places
+  its pieces; a median 22% within 5 mm outside the core (almost all of it in one patient); nearly none farther.
+- Descriptive and post hoc; it changes no frozen rule.
