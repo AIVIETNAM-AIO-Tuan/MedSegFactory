@@ -726,3 +726,13 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - `E0s_r1` done and confirmed on Drive; numbers in EXP-2026-007's run evidence.
 - Next: the first session (E-eval notebook, `MODEL = "E0"`, `SMOKE_FIRST = True`), then E3m's training, then the
   E-evals of E0s and E3m.
+
+## 2026-11-27 - EXP-2026-007 round 1 done
+
+- E3m: INCONCLUSIVE, not kept (pooled delta −0.0008 against a seed comparator of 0.0010). No model beats the
+  scaffold on the primary MAE. The numbers are in the card's run evidence.
+- Cost: 38 minutes of training per run (E3m's cache adds 12); about 2 hours of E-eval per model, peak 52 GiB.
+- Next:
+  - Read the three E-eval records: the smoke, E0's held-out losses, W7's precision and off-piece volume, and the
+    memorization matches.
+  - Then the researcher decides round 2's primary endpoint, or whether round 2 runs at all.

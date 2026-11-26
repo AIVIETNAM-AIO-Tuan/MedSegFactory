@@ -216,6 +216,9 @@ Same budget as r2 for every run: 1,000 steps, same optimizer and seed. One chang
   reported as inconclusive, not as no effect.
 - Measured cost of r2: 38 minutes of training, 63 minutes in total, peak 64.9 GiB on the RTX PRO 6000 Blackwell.
   Three runs are about three GPU hours, before sampling. Sampling cost comes from Step 0.
+- Round 1 result (2026-11-27, EXP-2026-007): E3m INCONCLUSIVE and not kept (pooled delta −0.0008 against a seed
+  comparator of 0.0010). No model (E0, E0s, E3m) beats the scaffold's primary MAE. E-eval takes about 2 hours per
+  model.
 
 ## 5. Order and dependencies
 

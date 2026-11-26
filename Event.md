@@ -1326,3 +1326,26 @@ after run r1.
   the smoke still precedes E3m's training.
 - Also: the E-eval notebook now says which of MODEL, TRAIN_TAG and SMOKE_FIRST to change when they disagree
   (ab57dbb), after the researcher hit that check.
+
+## 2026-11-27 - EXP-2026-007 round 1 complete: E3m INCONCLUSIVE; no model beats the scaffold
+
+- Runs on the Colab G4: the first session (smoke and E0's E-eval, `eval_E0_r1`), training `E3m_r1`, and the E-evals
+  `eval_E0s_r1` and `eval_E3m_r1` (commit 6ffbe27). All records confirmed by MD5; the E-eval metrics recompute
+  identically from the saved stacks.
+- E3m's training contract held: step-0 state equal to E0s's, 25 LUMIERE members, empty prompts and the noise
+  partner on 100% of LUMIERE draws.
+- Decision (frozen rules, rechecked by Claude): INCONCLUSIVE. The pooled delta, −0.00084 (interval −0.00152 to
+  −0.00007), is smaller than the pooled seed comparator, 0.00101; every other PROMOTE condition holds. E3m is not
+  kept; round 2, if run, goes against E0.
+- Decision 8: no model adds value over the scaffold. Pooled gains: −0.0017, −0.0015 and −0.0008 for E0, E0s
+  and E3m; each is worse than the scaffold on 6 of 7 patients. The scaffold beats the copy by 0.0251 on 7 of 7.
+- Secondary readouts, E3m against E0s:
+  - held-out image loss lower (RHUH −2.7%, LUMIERE −9.5%), oracle mask loss higher (+13%);
+  - W7 kept share 0.359 against E0's 0.114 (comparator 0.112), not interpreted yet;
+  - 4 more memorization alerts, against LUMIERE training slices, in E3m's own bank.
+- Defects found on Colab and fixed during the session:
+  - d6448f8: the package import overwrote `MODEL`;
+  - a719273: LUMIERE's folder sits behind a shortcut;
+  - 6ffbe27: the empty-prompt check compared bit for bit.
+- Two failed E3m starts came from a stale laptop copy of the training notebook. The copy now matches the fork.
+- Not verified: the smoke's result, which is stored in E0's record.
