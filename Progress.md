@@ -743,3 +743,10 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   (median). The no-residual rule is right on 19 of 27 patients and misses residuals of 0.2 to 1.8 ml in the other 8.
 - About a fifth of the real residual lies just outside the pre-op core, where the residual rule cannot place pieces.
 - Next: the researcher decides the next card (the evaluation hierarchy and its primary endpoint).
+
+## 2026-11-27 - Exploratory: the floor of the primary MAE
+
+- Far from the tumor the pre-op and post-op scans already differ by MAE 0.095 (median), against 0.138 for the
+  scaffold in the primary region: most of the paired error is the scan-to-scan floor, not the surgery.
+- The edema zone is not special (1.23 times the floor). This supports moving the primary endpoint away from paired
+  MAE (the researcher's decision for the next card).

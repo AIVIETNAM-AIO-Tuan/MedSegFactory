@@ -1364,3 +1364,13 @@ after run r1.
 - Where the real residual lies (8 patients): a median 78% inside the pre-op core, where the residual rule places
   its pieces; a median 22% within 5 mm outside the core (almost all of it in one patient); nearly none farther.
 - Descriptive and post hoc; it changes no frozen rule.
+
+## 2026-11-27 - Exploratory: where the scaffold's primary-region error lies
+
+- Same 27 accepted RHUH patients, raw per-voxel error (not the frozen scorer); script and per-patient rows private
+  in `data/RHUH-GBM/synthesis/analysis_mask_scaffold_2026-11-27/`.
+- Scaffold primary-region MAE median 0.138. The same difference far from the tumor (stable region, beyond 30 mm),
+  where surgery changes nothing, is 0.095: about two thirds of the primary error is the floor between two scans.
+- Shares of the primary region and of its error: margin within 10 mm outside the labels 61% and 61%, pre-op edema
+  zone 22% and 18%, core 11% and 13%, ramp 6% and 7%. Edema-zone MAE is 1.23 times the floor (margin 1.18).
+- So a perfect edema rendering could lower the primary MAE by roughly 0.005 at most. Descriptive and post hoc.
