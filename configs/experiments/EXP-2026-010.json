@@ -1,0 +1,35 @@
+{
+  "experiment": "EXP-2026-010",
+  "card": "experiments/registry/EXP-2026-010.md",
+  "approved": "2026-11-28, decisions 1-8 ('duyệt')",
+  "run": {
+    "name": "K1",
+    "training": "r2 recipe (EXP-2026-001 stage5_pilot.training) with soft cavity targets",
+    "train_seed": 2026,
+    "start": "the shared step-0 state of E0s and E3m: the author checkpoint (SHA-256 equal to r2's) widened 4 to 11, fresh AdamW",
+    "cohorts": ["RHUH"],
+    "evaluated_checkpoint_step": 1000
+  },
+  "text_class_names": {"1": "resection cavity"},
+  "cavity_target": {
+    "provenance": "rule_derived",
+    "region": "pre-op core (IDs 1 and 3) dilated by margin_mm, inside the support-restricted primary region, every sequence's foreground, and the expert's label 0",
+    "margin_mm": 2.0,
+    "t1_max": -1.5,
+    "t2_min": 1.5,
+    "width": 0.5,
+    "cap": 0.8,
+    "channel_id": 1,
+    "prompt_threshold": 0.5
+  },
+  "gate": {"max_mae": 0.1, "min_pearson": 0.9},
+  "test": {
+    "slab_slices": 12,
+    "level_f": 0.5,
+    "seeds": [11, 22, 33],
+    "batch_pairs": 6,
+    "residual_scenario": {"scenario_seed_base": 2026, "n_pieces": 2, "volume_ml": 0.8},
+    "expected_heldout": {"RHUH": 3, "LUMIERE": 4},
+    "bootstrap": {"resamples": 10000, "seed": 20261103, "stratified_by": "cohort"}
+  }
+}

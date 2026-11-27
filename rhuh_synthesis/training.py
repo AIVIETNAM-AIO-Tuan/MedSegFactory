@@ -29,7 +29,7 @@ import numpy as np
 import torch
 from diffusers.utils.torch_utils import randn_tensor
 
-from .codec import MASK_CODECS, encode_image
+from .codec import MASK_CODECS, encode_image, encode_soft_cavity_channels
 from .model import _check_generator, encode_pre_image, mask_fractions, training_loss
 from .text import TARGET_INFORMED, target_informed_prompts
 
@@ -164,15 +164,18 @@ def build_feature_cache(
     with torch.no_grad():
         for patient in sorted(exports):
             arrays = _checked_export(patient, exports[patient])
+            cavity = _checked_cavity(patient, exports[patient], arrays, mask_codec)
             chunks = {name: [] for name in _CACHE_FIELDS}
             for start in range(0, len(arrays["label"]), batch):
                 part = {name: value[start : start + batch] for name, value in arrays.items()}
                 pre = torch.from_numpy(np.ascontiguousarray(part["pre_image"], dtype=np.float32))[:, None]
                 chunks["z_pre"].append(encode_pre_image(vae, pre).float().cpu())
                 chunks["m_pre"].append(mask_fractions(part["pre_label"]))
+                target = (encode_target_mask(part["label"]) if cavity is None
+                          else encode_soft_cavity_channels(part["label"], cavity[start : start + batch]))
                 for name, coded in (
                     ("image", encode_image(part["post_image"])),
-                    ("mask", encode_target_mask(part["label"])),
+                    ("mask", target),
                 ):
                     x = torch.from_numpy(np.ascontiguousarray(coded)).to(device=device, dtype=dtype)
                     posterior = vae.encode(x).latent_dist
@@ -182,7 +185,11 @@ def build_feature_cache(
             grids = {tuple(record[name].shape[2:]) for name in _CACHE_FIELDS}
             if len(grids) != 1:
                 raise ValueError(f"{patient}: latent grids {grids} disagree (mask cell vs VAE factor)")
-            record["prompts"] = [_slice_prompts(label_slice, text_config) for label_slice in arrays["label"]]
+            prompt_labels = arrays["label"] if cavity is None else np.where(
+                cavity >= CAVITY_PROMPT_THRESHOLD, CAVITY_ID, arrays["label"]).astype(arrays["label"].dtype)
+            record["prompts"] = [_slice_prompts(label_slice, text_config) for label_slice in prompt_labels]
+            if cavity is not None:
+                record["cavity_target"] = True
             patients[patient] = record
 
         strings = sorted(
@@ -597,6 +604,28 @@ def _checked_export(patient, arrays):
     if not np.isfinite(post).all() or post.min() < 0.0 or post.max() > 1.0:
         raise ValueError(f"{patient}: post_image must be finite and lie in [0, 1]")
     return checked
+
+
+CAVITY_ID = 1  # EXP-2026-010: the soft cavity target uses the ID-1 channel, unused by RHUH's post-op labels
+CAVITY_PROMPT_THRESHOLD = 0.5  # a slice's prompt names the cavity where p reaches this value
+
+
+def _checked_cavity(patient, export, arrays, mask_codec):
+    """The optional soft cavity target ``cavity_soft`` [Z, H, W] in [0, 1] (EXP-2026-010), checked; or None."""
+    if "cavity_soft" not in export:
+        return None
+    if mask_codec != "class_separated_rgb":
+        raise ValueError(f"{patient}: a soft cavity target needs the class_separated_rgb codec")
+    cavity = np.asarray(export["cavity_soft"], dtype=np.float32)
+    if cavity.shape != arrays["label"].shape:
+        raise ValueError(f"{patient}: cavity_soft {cavity.shape} differs from the label's {arrays['label'].shape}")
+    if not np.isfinite(cavity).all() or cavity.min() < 0.0 or cavity.max() > 1.0:
+        raise ValueError(f"{patient}: cavity_soft must be finite and lie in [0, 1]")
+    if (arrays["label"] == CAVITY_ID).any():
+        raise ValueError(f"{patient}: the post-op label already uses ID {CAVITY_ID}")
+    if ((cavity > 0) & (arrays["label"] != 0)).any():
+        raise ValueError(f"{patient}: a soft cavity value lies on an expert label")
+    return cavity
 
 
 def _checked_image_only(patient, arrays):

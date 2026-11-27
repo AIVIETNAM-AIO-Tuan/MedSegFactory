@@ -61,6 +61,28 @@ def encode_mask_channels(labels, ids=CLASS_IDS):
     return channels * 2.0 - 1.0
 
 
+def encode_soft_cavity_channels(labels, cavity_soft, ids=CLASS_IDS, cavity_id=1):
+    """``encode_mask_channels`` with a graded cavity channel (EXP-2026-010): that ID's channel holds ``2p - 1``.
+
+    ``cavity_soft`` is ``p`` in [0, 1] with the labels' shape. The labels must not use ``cavity_id`` (RHUH's post-op
+    labels never use ID 1), and ``p`` must be 0 wherever a label is present: the expert's label is never overwritten.
+    With ``p = 0`` everywhere the result equals ``encode_mask_channels(labels)``.
+    """
+    labels = np.asarray(labels)
+    p = np.asarray(cavity_soft, dtype=np.float32)
+    if p.shape != labels.shape:
+        raise ValueError(f"cavity_soft {p.shape} and labels {labels.shape} differ in shape")
+    if not np.isfinite(p).all() or p.min(initial=0.0) < 0.0 or p.max(initial=0.0) > 1.0:
+        raise ValueError("cavity_soft must be finite and lie in [0, 1]")
+    if (labels == cavity_id).any():
+        raise ValueError(f"The labels already use the cavity ID {cavity_id}")
+    if ((p > 0) & (labels != 0)).any():
+        raise ValueError("A soft cavity value lies on a labelled voxel")
+    channels = encode_mask_channels(labels, ids)
+    channels[..., tuple(ids).index(cavity_id), :, :] = 2.0 * p - 1.0
+    return channels
+
+
 def decode_mask_channels(decoded, ids=CLASS_IDS, threshold=0.5):
     """[..., 3, H, W] decoder output in [-1, 1] -> [..., H, W] uint8 IDs.
 
