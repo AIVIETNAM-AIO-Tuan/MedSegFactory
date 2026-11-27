@@ -771,3 +771,9 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - The tissue-class map finds the expert's residual tumour (recall 0.72) without calling it blood (conflict 0.006).
 - Its blood-like class looks like normal white matter (negative excess), so a stricter v2 rule is likely needed.
 - Next: the researcher reviews the pages in `data/RHUH-GBM/synthesis/EXP-2026-009/tissue_classes_v1/pages/`.
+
+## 2026-11-27 - EXP-2026-009 step 2 v2 done
+
+- Blood-like class stopped: T1-bright material beyond normal tissue is rare in RHUH at day 0 to 3 with 5-mm T1.
+- Fluid-like class: the researcher reviews `data/RHUH-GBM/synthesis/EXP-2026-009/tissue_classes_v2/pages_train/`,
+  checking whether teal marks the cavity or normal CSF.

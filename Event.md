@@ -1407,3 +1407,11 @@ after run r1.
 - The enhancing code sits at its far-tissue background (median excess 0.000).
 - Pending: the researcher's review of the private pages for the 16 patients with at least 0.5 ml of the blood-like
   class. That review decides between GO and ITERATE.
+
+## 2026-11-27 - EXP-2026-009 step 2 v2: blood-like class stopped by the frozen rule
+
+- v2 keeps the expert labels and adds blood-like and fluid-like classes on unlabelled voxels only.
+- On 24 RHUH training patients the conflict passes (0.000), but the median blood excess fails (-0.005). So the
+  blood-like class is STOPPED as a training target. Only 5 of 24 patients hold 0.5 ml of it or more.
+- The fluid-like class (median 13.5 ml, 56% inside the pre-op core) waits for the researcher's page review.
+- Validation (3 patients, reported only): conflict 0; blood-like 0, 1.3 and 0.35 ml.
