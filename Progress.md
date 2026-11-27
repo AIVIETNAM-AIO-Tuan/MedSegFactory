@@ -758,3 +758,10 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   Its held-out image loss gain is real (3 to 9 times the seed noise), but its primary MAE is not lower.
 - Next: the researcher chooses the next card. Claude's proposal: judge the learned renderer on label-image
   consistency (T1ce contrast at the scenario's pieces) and on rET segmentation, not on paired MAE.
+
+## 2026-11-27 - EXP-2026-009 step 1 done: FAIL
+
+- Packing (T1ce, T1, T1ce) into the frozen VAE roughly doubles T1ce's reconstruction error (median ratio 1.80).
+  T1 itself is fine (1.05).
+- Next: the researcher chooses between option B and option C. Claude's recommendation is C, starting with a simple
+  T1ce-to-T1 translation baseline.

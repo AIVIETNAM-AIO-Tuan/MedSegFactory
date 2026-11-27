@@ -1387,3 +1387,11 @@ after run r1.
 - E3m's held-out image loss against E0: -3.0% on RHUH and -8.8% on LUMIERE, while E0s stays within 1.2%.
 - On the 7 held-out patients, the stable-region floor (median 0.059) is about half of the scaffold's primary MAE (0.114).
 - Memorization alerts recur at the same edge slices across models and seeds, and on the copy too.
+
+## 2026-11-27 - EXP-2026-009 step 1: packing T1 with T1ce in the VAE fails (frozen rule)
+
+- Run by the researcher on the Colab GPU (commit baef64b), 24 RHUH training patients, W4 slabs.
+- T1 survives packing (median MAE ratio 1.05). T1ce does not: the median ratio is 1.80, and 22 of 24 patients are
+  above 1.5. Decision: FAIL.
+- So option A is not taken; per decision 2, B (a separate T1 stream) or C (two stages) is next.
+- Post hoc probe on 6 slices: the failure is not a channel-luminance effect, and no channel order rescues T1ce.
