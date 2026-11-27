@@ -777,3 +777,10 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
 - Blood-like class stopped: T1-bright material beyond normal tissue is rare in RHUH at day 0 to 3 with 5-mm T1.
 - Fluid-like class: the researcher reviews `data/RHUH-GBM/synthesis/EXP-2026-009/tissue_classes_v2/pages_train/`,
   checking whether teal marks the cavity or normal CSF.
+
+## 2026-11-28 - EXP-2026-010 ready to run
+
+- Next:
+  1. The researcher runs `notebooks/RHUH_GBM_Colab_k1_train.ipynb` on the G4 (about 1.2 hours) and sends the GATE
+     block if it stops, else the SUMMARY block.
+  2. Then `notebooks/RHUH_GBM_Colab_k1_test.ipynb` (about 1.5 hours).

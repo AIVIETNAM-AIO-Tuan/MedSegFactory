@@ -1415,3 +1415,15 @@ after run r1.
   blood-like class is STOPPED as a training target. Only 5 of 24 patients hold 0.5 ml of it or more.
 - The fluid-like class (median 13.5 ml, 56% inside the pre-op core) waits for the researcher's page review.
 - Validation (3 patients, reported only): conflict 0; blood-like 0, 1.3 and 0.35 ml.
+
+## 2026-11-28 - EXP-2026-010 approved and implemented: a soft cavity class in the mask stream
+
+- The researcher approved decisions 1-8 ("duyệt"). The soft target proposal was the researcher's: the fluid rule has
+  no expert check, so the target carries its confidence. p = 0.8 x step(T1 dark) x step(T2 bright), inside the
+  pre-op core + 2 mm, never on expert labels; it is written in the unused ID-1 channel.
+- Commit 070e78e:
+  - code: codec, training cache option, `cavity_targets`, `cavity_test`, and config EXP-2026-010.json;
+  - two notebooks: K1 training with the VAE gate before training; the primary test against E0.
+- Tests: 131 passed locally. Static checks and CPU dry runs of both notebooks passed; the gate correctly stopped
+  a random VAE.
+- Proposed change to decision 6: K1's E-eval runs only if the primary test is not REJECT.
