@@ -1395,3 +1395,15 @@ after run r1.
   above 1.5. Decision: FAIL.
 - So option A is not taken; per decision 2, B (a separate T1 stream) or C (two stages) is next.
 - Post hoc probe on 6 slices: the failure is not a channel-luminance effect, and no channel order rescues T1ce.
+
+## 2026-11-27 - EXP-2026-009 step 2: tissue-class map v1 on 24 RHUH training patients
+
+- Run on the laptop CPU (code 7646176). The region is the pre-op core + 5 mm, and the classes come from the frozen
+  C4 rule applied voxel by voxel.
+- The automatic gate passes: median recall of expert ID 3 is 0.72 (gate 0.5), and median conflict is 0.006
+  (gate 0.2).
+- But the blood-like class is not specific: its share in the region is below its share in far normal tissue (median
+  excess -0.066). Likely reading: normal white matter reaches z(T1) >= 1.
+- The enhancing code sits at its far-tissue background (median excess 0.000).
+- Pending: the researcher's review of the private pages for the 16 patients with at least 0.5 ml of the blood-like
+  class. That review decides between GO and ITERATE.

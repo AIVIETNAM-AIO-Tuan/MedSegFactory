@@ -765,3 +765,9 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   T1 itself is fine (1.05).
 - Next: the researcher chooses between option B and option C. Claude's recommendation is C, starting with a simple
   T1ce-to-T1 translation baseline.
+
+## 2026-11-27 - EXP-2026-009 step 2 run; page review pending
+
+- The tissue-class map finds the expert's residual tumour (recall 0.72) without calling it blood (conflict 0.006).
+- Its blood-like class looks like normal white matter (negative excess), so a stricter v2 rule is likely needed.
+- Next: the researcher reviews the pages in `data/RHUH-GBM/synthesis/EXP-2026-009/tissue_classes_v1/pages/`.
