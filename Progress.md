@@ -784,3 +784,8 @@ Every decision the run needs is taken: decision 9 (HD-GLIO-AUTO reading) was con
   1. The researcher runs `notebooks/RHUH_GBM_Colab_k1_train.ipynb` on the G4 (about 1.2 hours) and sends the GATE
      block if it stops, else the SUMMARY block.
   2. Then `notebooks/RHUH_GBM_Colab_k1_test.ipynb` (about 1.5 hours).
+
+## 2026-11-28 - Storage-precision check done
+
+- The uint16 stacks and the fp16 memorization bank change every readout by far less than the smallest effect we
+  read. No data-type change is needed.

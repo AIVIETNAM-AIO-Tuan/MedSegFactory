@@ -1427,3 +1427,18 @@ after run r1.
 - Tests: 131 passed locally. Static checks and CPU dry runs of both notebooks passed; the gate correctly stopped
   a random VAE.
 - Proposed change to decision 6: K1's E-eval runs only if the primary test is not REJECT.
+
+## 2026-11-28 - Exploratory: storage precision does not change the readouts
+
+- Asked by the researcher, after seeing large fp32 <-> fp16 errors elsewhere. Run on the laptop CPU over 27 RHUH
+  training and validation exports; script and values are private in
+  `data/RHUH-GBM/synthesis/analysis_precision_2026-11-28/`.
+- Generation runs in fp32 and training in bf16 mixed precision. Storage is quantized in two places: the saved
+  stacks are uint16 fractions, and the memorization bank is fp16.
+- Scores (copy, scaffold and textured scaffold, stored in the frame):
+  - uint16 changes primary MAE by at most 1.3e-6, SSIM by 1.7e-6 and the core median by 7.5e-6;
+  - fp16 storage, which we do not use, would change the core median by up to 2.2e-4.
+  - The smallest effect interpreted so far is 8e-4.
+- Memorization: the fp16 bank changes the maximum correlation by at most 1.6e-4 (r up to 0.979). Over 179 queries,
+  no best match and no alert at 0.95 changed.
+- No change is needed.
